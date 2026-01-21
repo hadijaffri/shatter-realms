@@ -1,0 +1,12 @@
+{
+  "name": "shatterrealms-game",
+  "version": "1.0.0",
+  "description": "ShatterRealms - A 3D wave-based dungeon crawler combat game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["game", "three.js", "3d", "combat", "wave-based"],
+  "license": "MIT"
+}
