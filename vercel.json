@@ -1,6 +1,7 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/shatterrealms_v5.html" }
+    { "source": "/api/save", "destination": "/api/save" },
+    { "source": "/", "destination": "/index.html" }
   ],
   "headers": [
     {

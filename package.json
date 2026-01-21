@@ -1,12 +1,20 @@
 {
   "name": "shatterrealms-game",
   "version": "1.0.0",
-  "description": "ShatterRealms - A 3D wave-based dungeon crawler combat game",
+  "description": "ShatterRealms - A 3D wave-based dungeon crawler combat game with multiplayer PvP",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "party:dev": "partykit dev",
+    "party:deploy": "partykit deploy"
   },
-  "keywords": ["game", "three.js", "3d", "combat", "wave-based"],
-  "license": "MIT"
+  "keywords": ["game", "three.js", "3d", "combat", "wave-based", "multiplayer", "pvp"],
+  "license": "MIT",
+  "dependencies": {
+    "partysocket": "^0.0.25"
+  },
+  "devDependencies": {
+    "partykit": "^0.0.108"
+  }
 }

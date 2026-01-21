@@ -17,5 +17,12 @@ Thumbs.db
 # Vercel
 .vercel/
 
+# PartyKit
+.partykit/
+
 # Poetry
 poetry.lock
+
+# Environment
+.env
+.env.local
