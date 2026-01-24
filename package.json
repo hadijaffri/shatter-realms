@@ -9,12 +9,24 @@
     "party:dev": "partykit dev",
     "party:deploy": "partykit deploy"
   },
-  "keywords": ["game", "three.js", "3d", "combat", "wave-based", "multiplayer", "pvp"],
+  "keywords": [
+    "game",
+    "three.js",
+    "3d",
+    "combat",
+    "wave-based",
+    "multiplayer",
+    "pvp"
+  ],
   "license": "MIT",
   "dependencies": {
-    "partysocket": "^0.0.25"
+    "dotenv": "^17.2.3",
+    "partysocket": "^0.0.25",
+    "stripe": "^20.2.0"
   },
   "devDependencies": {
-    "partykit": "^0.0.108"
+    "@types/node": "^25.0.10",
+    "partykit": "^0.0.108",
+    "typescript": "^5.9.3"
   }
 }

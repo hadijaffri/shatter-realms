@@ -32,7 +32,7 @@ export default class GameServer implements Party.Server {
         winner: null
     };
 
-    timerInterval: ReturnType<typeof setInterval> | null = null;
+    lastTimerUpdate: number = 0;
 
     onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
         // Player connected, wait for join message with player data
@@ -109,6 +109,7 @@ export default class GameServer implements Party.Server {
         const playersArray = Array.from(this.state.players.values());
         conn.send(JSON.stringify({
             type: "game_state",
+            playerId: conn.id,
             players: playersArray,
             matchStartTime: this.state.matchStartTime,
             matchDuration: this.state.matchDuration,
@@ -220,24 +221,9 @@ export default class GameServer implements Party.Server {
             player.health = player.maxHealth;
         });
 
-        // Start timer
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-        }
-
-        this.timerInterval = setInterval(() => {
-            const timeRemaining = this.getTimeRemaining();
-
-            // Broadcast time update every 10 seconds
-            if (timeRemaining % 10000 < 1000) {
-                this.broadcastTimeUpdate();
-            }
-
-            // Check for match end
-            if (timeRemaining <= 0) {
-                this.endMatch();
-            }
-        }, 1000);
+        // Start timer using alarm
+        this.lastTimerUpdate = Date.now();
+        this.room.storage.setAlarm(Date.now() + 1000);
 
         // Broadcast match start
         this.room.broadcast(JSON.stringify({
@@ -245,6 +231,27 @@ export default class GameServer implements Party.Server {
             matchStartTime: this.state.matchStartTime,
             matchDuration: this.state.matchDuration
         }));
+    }
+
+    async onAlarm() {
+        if (this.state.matchEnded) return;
+
+        const timeRemaining = this.getTimeRemaining();
+        const now = Date.now();
+
+        // Broadcast time update every 10 seconds
+        if (now - this.lastTimerUpdate >= 10000) {
+            this.broadcastTimeUpdate();
+            this.lastTimerUpdate = now;
+        }
+
+        // Check for match end
+        if (timeRemaining <= 0) {
+            this.endMatch();
+        } else {
+            // Schedule next alarm in 1 second
+            this.room.storage.setAlarm(Date.now() + 1000);
+        }
     }
 
     getTimeRemaining(): number {
@@ -263,11 +270,6 @@ export default class GameServer implements Party.Server {
         if (this.state.matchEnded) return;
 
         this.state.matchEnded = true;
-
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-        }
 
         // Find winner (most kills)
         let winner: Player | null = null;
@@ -304,10 +306,6 @@ export default class GameServer implements Party.Server {
     }
 
     resetMatch() {
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-        }
         this.state = {
             players: new Map(),
             matchStartTime: 0,
@@ -315,5 +313,6 @@ export default class GameServer implements Party.Server {
             matchEnded: false,
             winner: null
         };
+        this.lastTimerUpdate = 0;
     }
 }

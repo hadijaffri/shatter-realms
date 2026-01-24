@@ -1,9 +1,23 @@
+// Load environment variables
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = 8000;
 const DATA_FILE = path.join(__dirname, 'playerdata.json');
+
+// Initialize Stripe
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// Verify Stripe is configured
+if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('Stripe not configured. Please set STRIPE_SECRET_KEY environment variable.');
+    process.exit(1);
+}
+
+console.log('Stripe configured successfully!');
 
 // Initialize data file if it doesn't exist
 if (!fs.existsSync(DATA_FILE)) {

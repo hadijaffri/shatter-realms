@@ -4619,7 +4619,7 @@
 
             // Create WebSocket connection to PartyKit
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${wsProtocol}//${PARTYKIT_HOST}/party/game?room=${roomId}`;
+            const wsUrl = `${wsProtocol}//${PARTYKIT_HOST}/parties/shatterrealms/${roomId}`;
 
             try {
                 partySocket = new WebSocket(wsUrl);
@@ -4700,7 +4700,7 @@
         }
 
         function handleGameState(data) {
-            myPlayerId = partySocket.url.split('id=')[1] || Date.now().toString();
+            myPlayerId = data.playerId;
             matchTimeRemaining = data.timeRemaining;
 
             // Add existing players
