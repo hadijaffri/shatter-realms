@@ -1,7 +1,7 @@
 // Multiplayer stress test script
 const WebSocket = require('ws');
 
-const PARTYKIT_HOST = 'shatterrealmsgame.hadijaffri.partykit.dev';
+const PARTYKIT_HOST = 'game.hadijaffri.partykit.dev';
 const ROOM_ID = 'test-room-' + Date.now();
 
 class TestPlayer {
