@@ -21,7 +21,7 @@ jobs:
         run: npm install --production
 
       - name: Deploy to PartyKit
-        run: npx partykit deploy --name shatterrealms
+        run: npx partykit deploy
         env:
           PARTYKIT_LOGIN: hadijaffri
           PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
