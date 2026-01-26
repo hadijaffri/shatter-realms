@@ -99,8 +99,8 @@ const server = http.createServer((req, res) => {
                         quantity: 1,
                     }],
                     mode: 'payment',
-                    success_url: `http://localhost:${PORT}/shatterrealms_v5.html?success=true&coins=${pack.coins}`,
-                    cancel_url: `http://localhost:${PORT}/shatterrealms_v5.html?canceled=true`,
+                    success_url: `http://localhost:${PORT}/?success=true&coins=${pack.coins}`,
+                    cancel_url: `http://localhost:${PORT}/?canceled=true`,
                     metadata: {
                         coins: pack.coins
                     }
@@ -126,7 +126,7 @@ const server = http.createServer((req, res) => {
     }
 
     // Serve static files
-    let filePath = req.url === '/' ? '/shatterrealms_v5.html' : req.url;
+    let filePath = req.url === '/' ? '/public/index.html' : req.url;
     filePath = path.join(__dirname, filePath);
 
     const extname = path.extname(filePath);
@@ -152,5 +152,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}/`);
-    console.log(`Game: http://localhost:${PORT}/shatterrealms_v5.html`);
+    console.log(`Game: http://localhost:${PORT}/`);
 });
