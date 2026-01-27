@@ -9,6 +9,7 @@ If you discover a security vulnerability in ShatterRealms, please help us by rep
 **DO NOT** create a public GitHub issue for security vulnerabilities.
 
 Instead:
+
 1. Email the maintainers privately (email TBD - add your contact)
 2. Include "SECURITY" in the subject line
 3. Provide:
@@ -32,12 +33,14 @@ We'll respond within 48 hours and work with you to fix the issue.
 ### Check Before Pushing
 
 Before pushing code, verify:
+
 ```bash
 git diff
 ```
 
 Look for:
-- API keys (sk_*, pk_*)
+
+- API keys (sk*\*, pk*\*)
 - Database URLs
 - Password strings
 - Personal email addresses
@@ -50,10 +53,10 @@ Look for:
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| main    | ✅ Yes             |
-| older   | ❌ No              |
+| Version | Supported |
+| ------- | --------- |
+| main    | ✅ Yes    |
+| older   | ❌ No     |
 
 We only support the latest version on the `main` branch.
 
@@ -83,6 +86,7 @@ ShatterRealms has these intentional design choices:
 ### Future Improvements
 
 As the project grows, we may add:
+
 - User authentication (for leaderboards, accounts)
 - Rate limiting on API endpoints
 - Server-side validation for all game actions

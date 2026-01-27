@@ -8,27 +8,27 @@ ShatterRealms originally had **all game logic in a single 5,141-line HTML file**
 
 ### ✅ Completed Modules
 
-| Module | Lines | Purpose | Status |
-|--------|-------|---------|--------|
-| `public/js/utils.js` | 40 | Cookie helpers, device ID, utilities | ✅ Complete |
-| `public/js/constants.js` | 130 | Shop items, inventory config | ✅ Complete |
-| `public/js/README.md` | 200 | Module documentation & roadmap | ✅ Complete |
+| Module                   | Lines | Purpose                              | Status      |
+| ------------------------ | ----- | ------------------------------------ | ----------- |
+| `public/js/utils.js`     | 40    | Cookie helpers, device ID, utilities | ✅ Complete |
+| `public/js/constants.js` | 130   | Shop items, inventory config         | ✅ Complete |
+| `public/js/README.md`    | 200   | Module documentation & roadmap       | ✅ Complete |
 
 **Total Extracted:** ~370 lines (~7% of JavaScript code)
 
 ### 🔲 Remaining Work
 
-| Module | Est. Lines | Priority | Complexity |
-|--------|-----------|----------|------------|
-| `shop.js` | 250 | High | Medium |
-| `inventory.js` | 200 | High | Medium |
-| `particles.js` | 300 | Medium | Low |
-| `ui.js` | 500 | Medium | Medium |
-| `weapons.js` | 700 | High | High |
-| `enemies.js` | 600 | Medium | High |
-| `player.js` | 400 | High | Very High |
-| `multiplayer.js` | 400 | Medium | High |
-| `game.js` | 800 | Critical | Very High |
+| Module           | Est. Lines | Priority | Complexity |
+| ---------------- | ---------- | -------- | ---------- |
+| `shop.js`        | 250        | High     | Medium     |
+| `inventory.js`   | 200        | High     | Medium     |
+| `particles.js`   | 300        | Medium   | Low        |
+| `ui.js`          | 500        | Medium   | Medium     |
+| `weapons.js`     | 700        | High     | High       |
+| `enemies.js`     | 600        | Medium   | High       |
+| `player.js`      | 400        | High     | Very High  |
+| `multiplayer.js` | 400        | Medium   | High       |
+| `game.js`        | 800        | Critical | Very High  |
 
 **Total Remaining:** ~4,150 lines
 
@@ -45,21 +45,25 @@ ShatterRealms originally had **all game logic in a single 5,141-line HTML file**
 ### Safe Extraction Strategy
 
 **Phase 1: Data & Utilities** ✅
+
 - Extract constants and helper functions
 - Low risk, high value
 - Already complete
 
 **Phase 2: Self-Contained Systems** (Next)
+
 - Shop, inventory, particles
 - Have clear boundaries
 - Can be extracted with minimal changes
 
 **Phase 3: Game Systems**
+
 - Weapons, enemies, player
 - Require careful dependency management
 - Need extensive testing
 
 **Phase 4: Core Engine**
+
 - Game loop, Three.js setup, multiplayer
 - Most complex, highest risk
 - Should be last
@@ -74,17 +78,20 @@ ShatterRealms originally had **all game logic in a single 5,141-line HTML file**
 ## Next Steps
 
 ### Immediate (This Week)
+
 1. Extract shop.js with all shop functions
 2. Extract inventory.js with inventory management
 3. Update index.html to import these modules
 4. Test thoroughly
 
 ### Short-term (This Month)
+
 1. Extract particles.js
 2. Extract ui.js for HUD and menus
 3. Reduce HTML to <4000 lines
 
 ### Long-term (This Quarter)
+
 1. Extract weapon and enemy systems
 2. Extract player controller
 3. Extract game engine core
@@ -105,6 +112,7 @@ If you want to contribute to this refactoring:
 ## Testing Checklist
 
 After each refactoring:
+
 - [ ] Game loads without console errors
 - [ ] Singleplayer mode works (waves, combat)
 - [ ] Shop opens and items can be purchased
@@ -123,6 +131,7 @@ After each refactoring:
 ## Long-term Vision
 
 **Target Architecture:**
+
 ```
 public/
 ├── index.html           (~400 lines - just structure)

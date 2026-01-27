@@ -20,16 +20,16 @@ export default [
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         setInterval: 'readonly',
-        clearInterval: 'readonly'
-      }
+        clearInterval: 'readonly',
+      },
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': 'off',
       semi: ['error', 'always'],
       quotes: ['error', 'single', { avoidEscape: true }],
-      'no-trailing-spaces': 'error'
-    }
+      'no-trailing-spaces': 'error',
+    },
   },
   {
     files: ['**/*.test.js', '**/__tests__/**/*.js'],
@@ -43,9 +43,9 @@ export default [
         afterEach: 'readonly',
         beforeAll: 'readonly',
         afterAll: 'readonly',
-        jest: 'readonly'
-      }
-    }
+        jest: 'readonly',
+      },
+    },
   },
   {
     ignores: [
@@ -54,7 +54,7 @@ export default [
       '.partykit/',
       'dist/',
       'public/**/*.js',
-      'party/**/*.ts'
-    ]
-  }
+      'party/**/*.ts',
+    ],
+  },
 ];

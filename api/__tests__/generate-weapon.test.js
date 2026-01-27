@@ -20,7 +20,7 @@ describe('Weapon Generation', () => {
       damage: 25,
       cooldown: 500,
       price: 150,
-      rarity: 'common'
+      rarity: 'common',
     };
 
     expect(exampleWeapon).toHaveProperty('id');

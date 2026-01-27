@@ -2,6 +2,7 @@
   "name": "shatterrealms-game",
   "version": "1.0.0",
   "description": "ShatterRealms - A 3D wave-based dungeon crawler combat game with multiplayer PvP",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,7 +11,10 @@
     "party:deploy": "partykit deploy",
     "lint": "eslint \"api/**/*.js\"",
     "format": "prettier --write \"**/*.{js,ts,json,md}\"",
-    "test": "jest"
+    "format:check": "prettier --check \"**/*.{js,ts,json,md}\"",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage",
+    "check": "npm run lint && npm run format:check && npm test"
   },
   "keywords": [
     "game",
@@ -25,7 +29,8 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "partysocket": "^0.0.25",
-    "stripe": "^20.2.0"
+    "stripe": "^20.2.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

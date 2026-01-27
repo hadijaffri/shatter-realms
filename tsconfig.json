@@ -16,14 +16,6 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": [
-    "api/**/*.ts",
-    "party/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".vercel",
-    ".partykit"
-  ]
+  "include": ["api/**/*.ts", "party/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".vercel", ".partykit"]
 }
