@@ -20,6 +20,7 @@ This document describes the technical architecture, design decisions, and system
 ShatterRealms is a browser-based 3D dungeon crawler built with a serverless architecture. The game supports both singleplayer wave-based combat and real-time multiplayer PvP.
 
 **Technology Stack**:
+
 - **Frontend**: Vanilla JavaScript + Three.js (WebGL)
 - **Multiplayer**: PartyKit (WebSocket server on Cloudflare)
 - **Backend**: Vercel Serverless Functions (Node.js)
@@ -86,6 +87,7 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 ### Frontend (public/index.html + public/styles.css)
 
 **Responsibilities**:
+
 - 3D rendering with Three.js
 - Game loop (60 FPS target using requestAnimationFrame)
 - Player input handling (keyboard, mouse, touch)
@@ -95,6 +97,7 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 - Cookie-based persistence (device ID, settings)
 
 **Key Modules** (currently in single file, planned for modularization):
+
 - **Game Loop**: Main update/render cycle
 - **Player Controller**: Movement, combat, inventory
 - **Enemy System**: Spawning, AI, pathfinding
@@ -104,6 +107,7 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 - **Weapon System**: Inventory, attacks, cooldowns
 
 **Graphics**:
+
 - **Renderer**: WebGL via Three.js
 - **Post-Processing**: Bloom, FXAA anti-aliasing, color correction, vignette
 - **Lighting**: Ambient + directional + point lights for realism
@@ -113,33 +117,39 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 ### Backend - Vercel Serverless Functions (api/)
 
 **save.js**:
+
 - Handles GET/POST for player data
 - Currently in-memory (ephemeral)
 - Future: integrate with Vercel KV or Planetscale
 
 **stripe-config.js**:
+
 - Returns Stripe publishable key to client
 - Simple GET endpoint
 - No sensitive data exposure
 
 **create-checkout-session.js**:
+
 - Creates Stripe Checkout session for predefined packages
 - Handles 4 fixed coin packages
 - Redirects user to Stripe payment page
 
 **ai-coin-pricing.js**:
+
 - Dynamic pricing for custom coin amounts
 - Algorithmic volume discounts (not AI-based)
 - Creates ephemeral Stripe products/prices
 - Graceful degradation if Stripe fails
 
 **generate-weapon.js**:
+
 - Procedural weapon generation
 - Weighted rarity system
 - Random stats within balanced ranges
 - Special effects for rare+ weapons
 
-**CORS Helper (api/_lib/cors.js)**:
+**CORS Helper (api/\_lib/cors.js)**:
+
 - Shared CORS configuration
 - Reduces code duplication across endpoints
 
@@ -148,6 +158,7 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 **Technology**: PartyKit (Cloudflare Durable Objects + WebSockets)
 
 **Responsibilities**:
+
 - WebSocket connection management
 - Player position synchronization (30 FPS)
 - Server-authoritative combat validation
@@ -157,6 +168,7 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 - Player list management
 
 **Message Types**:
+
 - `join`: Player enters match
 - `leave`: Player exits
 - `move`: Position update (30 Hz)
@@ -166,6 +178,7 @@ ShatterRealms is a browser-based 3D dungeon crawler built with a serverless arch
 - `respawn`: Player returns to game
 
 **State Management**:
+
 - Persistent per-room state using Durable Objects
 - Stores player positions, health, kills, deaths
 - Auto-cleanup on disconnect
@@ -187,6 +200,7 @@ User Action → Client Updates → Render Frame
 ```
 
 **Save Persistence**:
+
 1. Client stores data in localStorage (immediate)
 2. Client stores deviceId in cookies (persistent across sessions)
 3. Client syncs to cloud via api/save (when coins change)
@@ -209,6 +223,7 @@ User Joins Match → WebSocket Connect (PartyKit)
 ```
 
 **Authority Model**:
+
 - **Client-Authoritative**: Player movement, input
 - **Server-Authoritative**: Combat, kills, deaths, match state
 - This prevents cheating while maintaining responsive controls
@@ -236,21 +251,25 @@ User Clicks Buy → Client calls api/create-checkout-session
 ### Vercel Deployment
 
 **What's Deployed**:
+
 - Static assets (public/index.html, public/styles.css, images)
-- Serverless functions (api/*.js)
+- Serverless functions (api/\*.js)
 
 **Build Configuration** (vercel.json):
+
 - Redirects for backwards compatibility
 - Environment variables for Stripe keys
 - Serverless function regions
 
 **Environment Variables** (set in Vercel dashboard):
+
 ```
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
 **Deploy Command**:
+
 ```bash
 vercel            # Deploy to preview
 vercel --prod     # Deploy to production
@@ -259,10 +278,12 @@ vercel --prod     # Deploy to production
 ### PartyKit Deployment
 
 **What's Deployed**:
+
 - WebSocket server (party/game.ts)
 - Hosted on Cloudflare Workers (edge network)
 
 **Configuration** (partykit.json):
+
 ```json
 {
   "name": "shatterrealms-multiplayer",
@@ -271,22 +292,26 @@ vercel --prod     # Deploy to production
 ```
 
 **Deploy Command**:
+
 ```bash
 npm run party:deploy
 ```
 
 **Post-Deployment**:
+
 - Update `PARTYKIT_HOST` in public/index.html with deployed URL
 - Format: `your-project.username.partykit.dev`
 
 ### CDN Resources
 
 External dependencies loaded from CDN:
+
 - Three.js (r128): `cdnjs.cloudflare.com`
 - PartySocket client: `unpkg.com`
 - Three.js addons (EffectComposer, passes, shaders)
 
 **Benefits**:
+
 - Browser caching across sites
 - Reduced bundle size
 - Faster initial load
@@ -298,12 +323,14 @@ External dependencies loaded from CDN:
 ### Why Serverless?
 
 **Pros**:
+
 - Zero server management
 - Auto-scaling to demand
 - Pay only for usage
 - Global edge network (low latency)
 
 **Cons**:
+
 - Cold starts (mitigated by Vercel Edge Functions)
 - Stateless (must use external storage for persistence)
 
@@ -312,11 +339,13 @@ External dependencies loaded from CDN:
 ### Why PartyKit for Multiplayer?
 
 **Alternatives Considered**:
+
 - Socket.io + Node.js server (requires server management)
 - Firebase Realtime Database (less control, higher latency)
 - WebRTC (complex, requires signaling server anyway)
 
 **Why PartyKit**:
+
 - Built on Cloudflare Durable Objects (globally distributed)
 - Simple WebSocket API
 - Automatic room management
@@ -328,6 +357,7 @@ External dependencies loaded from CDN:
 **Alternatives**: Unity WebGL, Babylon.js, PlayCanvas
 
 **Why Three.js**:
+
 - Lightweight (~600KB compressed)
 - Full control over rendering
 - Excellent documentation
@@ -339,11 +369,13 @@ External dependencies loaded from CDN:
 ### Client-Side vs. Server-Side Game Logic
 
 **Singleplayer**: 100% client-side
+
 - No server roundtrip needed
 - Instant response
 - Works offline (after initial load)
 
 **Multiplayer**: Hybrid
+
 - Movement: Client-predicted (responsive)
 - Combat: Server-validated (prevents cheating)
 - State: Server-authoritative (single source of truth)
@@ -351,11 +383,13 @@ External dependencies loaded from CDN:
 ### Cookie + LocalStorage + Cloud Sync
 
 **Why All Three**:
+
 - **Cookies**: Persist device ID across sessions/incognito
 - **LocalStorage**: Fast, synchronous access for frequent updates
 - **Cloud**: Backup, sync across devices (future)
 
 **Data Priority**:
+
 1. LocalStorage (primary, instant)
 2. Cloud API (backup, on load/save)
 3. Cookies (device identification)
@@ -369,6 +403,7 @@ External dependencies loaded from CDN:
 **Target**: 60 FPS on mid-range hardware
 
 **Techniques**:
+
 - Object pooling for enemies/projectiles (reduce GC)
 - Frustum culling (don't render off-screen objects)
 - LOD (level of detail) for distant objects (planned)
@@ -377,6 +412,7 @@ External dependencies loaded from CDN:
 - Post-processing optimizations (conditional based on device)
 
 **Mobile**:
+
 - Reduced particle count
 - Lower shadow quality
 - Simplified post-processing
@@ -385,6 +421,7 @@ External dependencies loaded from CDN:
 ### Network Optimization
 
 **Multiplayer Bandwidth**:
+
 - Position sync: 30 Hz (not 60)
 - Only send changed data
 - Use binary protocol (future enhancement)
@@ -394,10 +431,12 @@ External dependencies loaded from CDN:
 ### API Optimization
 
 **Caching**:
+
 - Stripe config cached client-side (sessionStorage)
 - Weapon generation is stateless (no caching needed)
 
 **Cold Starts**:
+
 - Vercel Edge Functions are faster
 - Keep functions small and focused
 
@@ -410,12 +449,14 @@ External dependencies loaded from CDN:
 ShatterRealms currently prioritizes ease of development over security. Suitable for demo/MVP.
 
 **What's Secure**:
+
 - ✅ Environment variables for API keys
 - ✅ Stripe test mode only
 - ✅ HTTPS for all traffic
 - ✅ No SQL (no SQL injection risk)
 
 **What's NOT Secure**:
+
 - ❌ No authentication (anyone can save data)
 - ❌ No rate limiting (potential abuse)
 - ❌ Client-side coin awards (can be manipulated)
@@ -425,26 +466,31 @@ ShatterRealms currently prioritizes ease of development over security. Suitable 
 ### Future Security Enhancements
 
 **Authentication**:
+
 - Add JWT or session-based auth
 - Require login for cloud saves
 - Associate saves with user accounts
 
 **Payment Verification**:
+
 - Implement Stripe webhooks
 - Server-side coin granting after payment confirmation
 - Prevent client-side manipulation
 
 **Rate Limiting**:
+
 - Limit API calls per IP/user
 - Prevent spam and abuse
 - Use Vercel Edge Config or Redis
 
 **Input Validation**:
+
 - Validate all user inputs server-side
 - Use schema validation (Zod, Joi)
 - Sanitize data before storage
 
 **CORS**:
+
 - Restrict to specific domains in production
 - Use environment-specific configuration
 
@@ -458,11 +504,13 @@ ShatterRealms currently prioritizes ease of development over security. Suitable 
 **Future**: Persistent storage
 
 **Options**:
+
 - Vercel KV (Redis, serverless)
 - Planetscale (MySQL, serverless)
 - Supabase (PostgreSQL + auth + realtime)
 
 **Schema** (Proposed):
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY,
@@ -548,12 +596,14 @@ npm run party:deploy
 ShatterRealms uses a modern serverless architecture that balances simplicity, scalability, and performance. The current implementation is optimized for rapid development and iteration, with clear paths for adding authentication, persistence, and security as the project matures.
 
 **Strengths**:
+
 - Zero infrastructure management
 - Global edge distribution (low latency)
 - Cost-effective (pay per use)
 - Easy to deploy and iterate
 
 **Areas for Growth**:
+
 - Authentication system
 - Persistent database
 - Payment verification

@@ -5,6 +5,7 @@ Thanks for your interest in contributing to ShatterRealms! This guide will help 
 ## Prerequisites
 
 Before you begin, make sure you have:
+
 - **Node.js 20 or newer** - [Download here](https://nodejs.org/)
 - **Git** - [Download here](https://git-scm.com/)
 - **A code editor** - We recommend [VS Code](https://code.visualstudio.com/)
@@ -30,6 +31,7 @@ npm install
 ### 3. Set Up Environment Variables
 
 1. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
@@ -46,6 +48,7 @@ npm install
 ### 4. Run the Game Locally
 
 Start the main game server:
+
 ```bash
 npm run dev
 ```
@@ -53,6 +56,7 @@ npm run dev
 Open your browser to `http://localhost:3000` to play!
 
 For multiplayer features, start the PartyKit server in a separate terminal:
+
 ```bash
 npm run party:dev
 ```
@@ -62,6 +66,7 @@ npm run party:dev
 ### Reporting Bugs
 
 Found a bug? Please create an issue using the bug report template:
+
 1. Go to the [Issues tab](../../issues)
 2. Click "New Issue"
 3. Select "Bug Report"
@@ -70,6 +75,7 @@ Found a bug? Please create an issue using the bug report template:
 ### Suggesting Features
 
 Have an idea for a new feature? We'd love to hear it!
+
 1. Go to the [Issues tab](../../issues)
 2. Click "New Issue"
 3. Select "Feature Request"
@@ -78,6 +84,7 @@ Have an idea for a new feature? We'd love to hear it!
 ### Making Code Changes
 
 1. **Create a new branch** for your changes:
+
    ```bash
    git checkout -b feature/your-feature-name
    # or
@@ -93,6 +100,7 @@ Have an idea for a new feature? We'd love to hear it!
    - Make sure there are no console errors
 
 4. **Commit your changes**:
+
    ```bash
    git add .
    git commit -m "Brief description of what you changed"
@@ -105,6 +113,7 @@ Have an idea for a new feature? We'd love to hear it!
    - ❌ "Changes"
 
 5. **Push to your fork**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -121,15 +130,17 @@ Have an idea for a new feature? We'd love to hear it!
 
 - **Indentation**: Use 2 spaces (not tabs)
 - **Naming**: Use camelCase for variables and functions
+
   ```javascript
   // Good
   let playerHealth = 100;
-  function spawnEnemy() { }
+  function spawnEnemy() {}
 
   // Bad
   let player_health = 100;
-  function SpawnEnemy() { }
+  function SpawnEnemy() {}
   ```
+
 - **Comments**: Add comments to explain complex logic
 - **No console.log**: Remove debug logs before submitting (unless needed for error handling)
 - **Keep it simple**: Don't over-engineer - simple code is better than clever code
@@ -137,6 +148,7 @@ Have an idea for a new feature? We'd love to hear it!
 ## What to Work On
 
 Not sure where to start? Check out:
+
 - Issues labeled [`good first issue`](../../labels/good%20first%20issue) - Perfect for beginners
 - Issues labeled [`help wanted`](../../labels/help%20wanted) - We need help with these!
 - The [Project Roadmap](../../projects) - See what features are planned
@@ -152,6 +164,7 @@ Not sure where to start? Check out:
 ## Testing Your Changes
 
 Before submitting a PR, verify:
+
 - [ ] Game loads without errors
 - [ ] Singleplayer mode works (enemies spawn, combat works, waves progress)
 - [ ] Weapon shop opens and items can be purchased
@@ -163,6 +176,7 @@ Before submitting a PR, verify:
 ## Getting Help
 
 Stuck? Need help? Here's how to get support:
+
 - **Questions about the code**: Open a [Discussion](../../discussions)
 - **Found a bug**: Create an [Issue](../../issues)
 - **Want to chat**: Join our community (link TBD)

@@ -49,6 +49,7 @@ cp .env.example .env
 ```
 
 Then add your Stripe test keys:
+
 - Get them from [Stripe Dashboard](https://dashboard.stripe.com/test/apikeys)
 - Add both `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` to `.env`
 
@@ -57,12 +58,15 @@ Then add your Stripe test keys:
 ### 3. Start Development Servers
 
 **Main game server:**
+
 ```bash
 npm run dev
 ```
+
 Then open `http://localhost:3000`
 
 **Multiplayer server (optional):**
+
 ```bash
 npm run party:dev
 ```
@@ -95,6 +99,7 @@ After deploying PartyKit, update the `PARTYKIT_HOST` variable in `public/index.h
 ### 4. Configure Domain (Optional)
 
 To use a custom domain like `shatter-realms.com`:
+
 1. Go to your Vercel project settings
 2. Navigate to "Domains"
 3. Add your custom domain
@@ -124,6 +129,7 @@ shatterrealms/
 ## Architecture Overview
 
 ### Frontend (public/index.html)
+
 - **Game Engine**: Three.js for 3D rendering
 - **Game Loop**: RequestAnimationFrame-based update loop (60 FPS target)
 - **Input Handling**: Keyboard/mouse for desktop, touch joysticks for mobile
@@ -132,6 +138,7 @@ shatterrealms/
 ### Backend Services
 
 **Vercel Serverless Functions** (api/)
+
 - `save.js` - Persist player data to cloud storage
 - `create-checkout-session.js` - Initialize Stripe payment flow
 - `stripe-config.js` - Provide Stripe publishable key to client
@@ -139,6 +146,7 @@ shatterrealms/
 - `generate-weapon.js` - Create unique weapons using AI
 
 **PartyKit Multiplayer Server** (party/game.ts)
+
 - Real-time WebSocket communication
 - Server-authoritative combat (validates hits, kills, damage)
 - Player position synchronization (30 FPS)
@@ -147,11 +155,13 @@ shatterrealms/
 ### Data Flow
 
 **Singleplayer Mode:**
+
 1. User plays waves → earns coins → saves to cloud via `api/save.js`
 2. User visits shop → calls `api/generate-weapon.js` → AI creates weapon
 3. Save updated with new inventory
 
 **Multiplayer Mode:**
+
 1. Client connects to PartyKit WebSocket server
 2. Position/action updates sent to server
 3. Server validates and broadcasts to all clients
@@ -160,6 +170,7 @@ shatterrealms/
 ## Game Controls
 
 ### Computer
+
 - **WASD**: Move
 - **Mouse**: Look around
 - **Left Click**: Attack/Use item
@@ -169,6 +180,7 @@ shatterrealms/
 - **Tab**: View scoreboard (multiplayer)
 
 ### Mobile
+
 - **Left Joystick**: Move
 - **Drag Screen**: Look around
 - **Attack Button**: Attack/Use item
@@ -178,6 +190,7 @@ shatterrealms/
 ## Multiplayer Protocol
 
 The game uses WebSocket for real-time multiplayer communication:
+
 - Position sync at 30fps
 - Server-authoritative damage and kill tracking
 - 5-minute match timer
@@ -186,27 +199,32 @@ The game uses WebSocket for real-time multiplayer communication:
 ## Common Issues & Troubleshooting
 
 ### Game won't start / Black screen
+
 - Check browser console (F12) for errors
 - Verify your browser supports WebGL: visit [get.webgl.org](https://get.webgl.org/)
 - Try a different browser (Chrome, Firefox recommended)
 - Clear cache and reload
 
 ### Stripe errors in development
+
 - Make sure you created a `.env` file (copy from `.env.example`)
 - Verify you're using **test mode** keys (start with `sk_test_` and `pk_test_`)
 - Check that keys are correctly pasted (no extra spaces)
 
 ### Multiplayer not connecting
+
 - Ensure `npm run party:dev` is running in a separate terminal
 - Check that PARTYKIT_HOST in `public/index.html` matches your PartyKit URL
 - For production, make sure you've deployed PartyKit with `npm run party:deploy`
 
 ### Save data not persisting
+
 - Cloud saves require the Vercel API to be running
 - Local development: Ensure `npm run dev` is active
 - Check browser cookies are enabled (used for device ID)
 
 ### "Module not found" errors
+
 - Run `npm install` to ensure all dependencies are installed
 - Delete `node_modules` and `package-lock.json`, then run `npm install` again
 

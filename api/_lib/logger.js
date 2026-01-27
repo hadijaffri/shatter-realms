@@ -7,7 +7,7 @@ const LOG_LEVELS = {
   ERROR: 'ERROR',
   WARN: 'WARN',
   INFO: 'INFO',
-  DEBUG: 'DEBUG'
+  DEBUG: 'DEBUG',
 };
 
 /**
@@ -19,7 +19,7 @@ function formatLog(level, message, meta = {}) {
     timestamp,
     level,
     message,
-    ...meta
+    ...meta,
   };
 
   return JSON.stringify(logObject);
@@ -31,9 +31,7 @@ function formatLog(level, message, meta = {}) {
  * @param {Error|Object} error - Error object or metadata
  */
 export function logError(message, error = {}) {
-  const meta = error instanceof Error
-    ? { error: error.message, stack: error.stack }
-    : error;
+  const meta = error instanceof Error ? { error: error.message, stack: error.stack } : error;
 
   console.error(formatLog(LOG_LEVELS.ERROR, message, meta));
 }
@@ -77,13 +75,13 @@ export function createRequestLogger(req) {
   const requestMeta = {
     requestId,
     method: req.method,
-    path: req.url
+    path: req.url,
   };
 
   return {
     error: (message, error) => logError(message, { ...requestMeta, ...error }),
     warn: (message, meta) => logWarn(message, { ...requestMeta, ...meta }),
     info: (message, meta) => logInfo(message, { ...requestMeta, ...meta }),
-    debug: (message, meta) => logDebug(message, { ...requestMeta, ...meta })
+    debug: (message, meta) => logDebug(message, { ...requestMeta, ...meta }),
   };
 }

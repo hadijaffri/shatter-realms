@@ -32,6 +32,7 @@ Whether you're an experienced developer or just starting out, we're glad you're 
 ### Not Okay
 
 These behaviors are unacceptable:
+
 - **Bullying, harassment, or mean comments** of any kind
 - **Trolling or insulting** other contributors
 - **Sharing others' private information** without permission
@@ -41,6 +42,7 @@ These behaviors are unacceptable:
 ## Reporting Issues
 
 If someone is violating this Code of Conduct:
+
 1. Don't engage in arguments
 2. Report it by creating a private issue or emailing the maintainers
 3. Provide specific details about what happened
@@ -49,6 +51,7 @@ If someone is violating this Code of Conduct:
 ## Consequences
 
 If someone breaks these rules:
+
 - **First time**: Private warning and explanation
 - **Second time**: Temporary ban from the project
 - **Serious or repeated violations**: Permanent ban
