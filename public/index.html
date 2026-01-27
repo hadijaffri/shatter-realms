@@ -2152,6 +2152,37 @@
             `;
             el.appendChild(coinPackagesDiv);
 
+            // Add generated weapons section (if any exist)
+            if (generatedShopWeapons.length > 0) {
+                const generatedDivider = document.createElement('div');
+                generatedDivider.className = 'shop-divider';
+                generatedDivider.style.cssText = 'background: linear-gradient(90deg, #a0f, #ff0, #a0f); color: #000; font-weight: bold;';
+                generatedDivider.textContent = '🎲 AI-GENERATED WEAPONS 🎲';
+                el.appendChild(generatedDivider);
+
+                generatedShopWeapons.forEach((weapon, index) => {
+                    const owned = inventory.ownedItems.includes(weapon.id);
+                    const canAfford = inventory.coins >= weapon.price;
+                    const rarityColor = getRarityColor(weapon.rarity);
+
+                    const div = document.createElement('div');
+                    div.className = 'shop-item';
+                    div.style.cssText = `border-left: 3px solid ${rarityColor}; background: linear-gradient(90deg, rgba(160,0,255,0.1), transparent);`;
+                    div.innerHTML = `
+                        <span class="shop-item-icon">${weapon.icon}</span>
+                        <div class="shop-item-info">
+                            <div class="shop-item-name" style="color: ${rarityColor};">${weapon.name}</div>
+                            <div class="shop-item-desc">${weapon.desc}</div>
+                            <div style="font-size: 10px; color: #888;">DMG: ${weapon.damage} | ${weapon.rarity.toUpperCase()}</div>
+                            ${weapon.special ? `<div style="color: #ff0; font-size: 9px;">✨ ${weapon.special}</div>` : ''}
+                        </div>
+                        <span class="shop-item-price">${owned ? '✓' : '💰' + weapon.price}</span>
+                        ${owned ? '' : `<button class="shop-buy-btn" onclick="buyGeneratedWeapon(${index})" ${canAfford ? '' : 'disabled'}>Buy</button>`}
+                    `;
+                    el.appendChild(div);
+                });
+            }
+
             // Add divider
             const divider = document.createElement('div');
             divider.className = 'shop-divider';
@@ -2309,6 +2340,7 @@
 
         // ========== INVENTORY MANAGEMENT ==========
         let generatedWeapons = JSON.parse(localStorage.getItem('generatedWeapons') || '[]');
+        let generatedShopWeapons = JSON.parse(localStorage.getItem('generatedShopWeapons') || '[]');
         let inventoryOrder = JSON.parse(localStorage.getItem('inventoryOrder') || '[]');
 
         function openInventory() {
@@ -2322,6 +2354,22 @@
 
         function saveInventoryOrder() {
             localStorage.setItem('inventoryOrder', JSON.stringify(inventoryOrder));
+        }
+
+        function saveHotbar() {
+            localStorage.setItem('hotbarState', JSON.stringify(hotbar));
+        }
+
+        function loadHotbar() {
+            const saved = localStorage.getItem('hotbarState');
+            if (saved) {
+                const savedHotbar = JSON.parse(saved);
+                for (let i = 0; i < 6; i++) {
+                    if (savedHotbar[i] && (itemDefs[savedHotbar[i]] || generatedWeapons.find(w => w.id === savedHotbar[i]))) {
+                        hotbar[i] = savedHotbar[i];
+                    }
+                }
+            }
         }
 
         function renderInventory() {
@@ -2475,19 +2523,28 @@
 
                 div.ondragover = (e) => {
                     e.preventDefault();
-                    div.style.transform = 'scale(1.05)';
+                    div.style.transform = 'scale(1.1)';
                     div.style.borderColor = '#ff0';
+                    div.style.boxShadow = '0 0 15px rgba(255,255,0,0.6)';
                 };
 
                 div.ondragleave = (e) => {
                     div.style.transform = '';
                     div.style.borderColor = equipped ? '#0f0' : '#444';
+                    div.style.boxShadow = '';
                 };
 
                 div.ondrop = (e) => {
                     e.preventDefault();
-                    div.style.transform = '';
-                    div.style.borderColor = equipped ? '#0f0' : '#444';
+                    // Smooth transition on drop
+                    div.style.transition = 'all 0.2s ease';
+                    div.style.transform = 'scale(1.05)';
+                    div.style.boxShadow = '';
+                    setTimeout(() => {
+                        div.style.transform = '';
+                        div.style.borderColor = equipped ? '#0f0' : '#444';
+                        div.style.transition = '';
+                    }, 150);
 
                     const draggedWeaponId = e.dataTransfer.getData('weaponId');
                     const draggedInventoryIndex = e.dataTransfer.getData('inventoryIndex');
@@ -2506,23 +2563,33 @@
                     }
                 };
 
-                // Click to equip/unequip
+                // Click to equip/unequip with visual feedback
                 div.onclick = () => {
+                    // Visual click feedback
+                    div.style.transform = 'scale(0.95)';
+                    setTimeout(() => { div.style.transform = ''; }, 100);
+
                     if (equipped) {
                         // Unequip
                         const slotIndex = hotbar.indexOf(weaponId);
                         if (slotIndex !== -1) {
                             hotbar[slotIndex] = null;
+                            showNotification(`${item.name} unequipped`);
                         }
                     } else {
                         // Equip to first empty slot
                         const emptySlot = hotbar.findIndex(s => s === null);
                         if (emptySlot !== -1) {
                             hotbar[emptySlot] = weaponId;
+                            showNotification(`${item.name} equipped to slot ${emptySlot + 1}`);
+                        } else {
+                            showNotification('Hotbar full! Unequip a weapon first.');
+                            return;
                         }
                     }
                     renderInventory();
                     setupHotbar();
+                    saveHotbar();
                 };
 
                 // Right-click context menu
@@ -2570,6 +2637,19 @@
             return colors[rarity] || '#fff';
         }
 
+        function showNotification(message, duration = 2000) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
+                background: rgba(0,0,0,0.9); color: #ff0; padding: 15px 25px;
+                border-radius: 8px; z-index: 99999; font-size: 14px;
+                border: 1px solid #ff0; animation: fadeInOut ${duration}ms ease-in-out;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), duration);
+        }
+
         async function generateNewWeapon() {
             const btn = document.getElementById('generateWeaponBtn');
             btn.textContent = 'Generating...';
@@ -2588,18 +2668,19 @@
 
                 const data = await response.json();
                 if (data.success && data.weapon) {
-                    // Add to generated weapons
-                    generatedWeapons.push(data.weapon);
-                    localStorage.setItem('generatedWeapons', JSON.stringify(generatedWeapons));
+                    // Add to shop (NOT directly to inventory - must purchase!)
+                    generatedShopWeapons.push(data.weapon);
+                    localStorage.setItem('generatedShopWeapons', JSON.stringify(generatedShopWeapons));
 
-                    // Add to itemDefs so it works in game
+                    // Add to itemDefs so it can be displayed
                     itemDefs[data.weapon.id] = data.weapon;
 
-                    // Add to owned items
-                    inventory.ownedItems.push(data.weapon.id);
+                    // Show weapon details and prompt to buy
+                    const special = data.weapon.special ? `\nSpecial: ${data.weapon.special}` : '';
+                    alert(`New weapon generated!\n\n${data.weapon.name} (${data.weapon.rarity.toUpperCase()})\n${data.weapon.desc}\nDamage: ${data.weapon.damage}${special}\n\nPrice: ${data.weapon.price} coins\n\nCheck the shop to purchase!`);
 
-                    alert(`New weapon generated: ${data.weapon.name} (${data.weapon.rarity})\n${data.weapon.desc}`);
-                    renderInventory();
+                    // Open shop to show the new weapon
+                    openShop();
                 } else {
                     alert('Failed to generate weapon');
                 }
@@ -2612,10 +2693,55 @@
             btn.disabled = false;
         }
 
+        function buyGeneratedWeapon(index) {
+            const weapon = generatedShopWeapons[index];
+            if (!weapon) return;
+
+            if (inventory.coins >= weapon.price && !inventory.ownedItems.includes(weapon.id)) {
+                // Deduct coins
+                inventory.coins -= weapon.price;
+
+                // Add to owned items
+                inventory.ownedItems.push(weapon.id);
+
+                // Move from shop to owned generated weapons
+                generatedWeapons.push(weapon);
+                localStorage.setItem('generatedWeapons', JSON.stringify(generatedWeapons));
+
+                // Remove from shop
+                generatedShopWeapons.splice(index, 1);
+                localStorage.setItem('generatedShopWeapons', JSON.stringify(generatedShopWeapons));
+
+                // Auto-equip to empty slot if available
+                const emptySlot = hotbar.findIndex(s => s === null);
+                if (emptySlot !== -1) {
+                    hotbar[emptySlot] = weapon.id;
+                    saveHotbar();
+                }
+
+                // Update UIs
+                updateShopUI();
+                setupHotbar();
+                saveCoinsToCloud();
+
+                showNotification(`Purchased ${weapon.name}!`);
+            } else if (inventory.coins < weapon.price) {
+                showNotification('Not enough coins!');
+            }
+        }
+
         // Load generated weapons into itemDefs on startup
         generatedWeapons.forEach(w => {
             if (w && w.id) itemDefs[w.id] = w;
         });
+
+        // Load generated shop weapons into itemDefs on startup
+        generatedShopWeapons.forEach(w => {
+            if (w && w.id) itemDefs[w.id] = w;
+        });
+
+        // Load saved hotbar on startup
+        loadHotbar();
 
         function openSettings() { generateSettingsUI(); document.getElementById('settingsPanel').style.display = 'flex'; }
         function closeSettings() { document.getElementById('settingsPanel').style.display = 'none'; }
