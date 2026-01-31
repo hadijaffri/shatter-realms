@@ -20,6 +20,7 @@
             <button class="menu-btn" onclick="joinMultiplayer()" style="background: linear-gradient(135deg, #4a0080, #800080);">👥 Multiplayer</button>
             <button class="menu-btn shop-btn" onclick="openShop()">🛒 Shop</button>
             <button class="menu-btn" onclick="openInventory()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">📦 Inventory</button>
+            <button class="menu-btn" onclick="openFriendsPanel()" style="background: linear-gradient(135deg, #3498db, #2980b9);">👥 Friends</button>
             <button class="menu-btn settings-btn" onclick="openSettings()">⚙️ Settings</button>
             <button class="menu-btn quit-btn" onclick="quitGame()">🚪 Quit</button>
             <div id="menuCoins" style="color: gold; margin-top: 12px; font-size: 16px;">💰 0 <button id="menuAddCoins" onclick="openCustomCoinModal()" style="background: gold; color: #000; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 16px; font-weight: bold; cursor: pointer; margin-left: 5px;">+</button></div>
@@ -119,6 +120,8 @@
             <h2 style="color: gold; text-align: center; margin-bottom: 15px;">SCOREBOARD</h2>
             <div id="scoreboardContent"></div>
         </div>
+        <button id="voiceChatBtn" class="voice-chat-btn" onclick="toggleVoiceChat()" title="Voice Chat">🎤</button>
+        <div id="voiceIndicators" style="position: fixed; bottom: 80px; right: 15px; display: flex; flex-direction: column; gap: 4px; z-index: 100;"></div>
     </div>
 
     <div id="chatContainer" style="display: none; position: fixed; bottom: 70px; left: 15px; width: 350px; z-index: 150; pointer-events: none;">
@@ -151,6 +154,61 @@
             </div>
         </div>
     </div>
+
+    <!-- Friends Panel -->
+    <div id="friendsPanel" class="panel" style="display: none; max-width: 450px; border-color: #3498db;">
+        <div class="panel-header">
+            <h2 style="color: #3498db;">👥 Friends</h2>
+            <button class="close-btn" onclick="closeFriendsPanel()">✕</button>
+        </div>
+        <div class="panel-content">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="color: #aaa; font-size: 11px;">Your Friend Code</div>
+                <div id="myFriendCode" style="color: #3498db; font-size: 18px; font-weight: bold; margin: 5px 0;">Loading...</div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="addFriendInput" placeholder="Enter friend code (e.g. Player#1234)" style="flex: 1; padding: 8px; font-size: 12px; border: 2px solid #444; border-radius: 8px; background: #222; color: white;">
+                    <button class="menu-btn" onclick="sendFriendRequest()" style="padding: 8px 15px; font-size: 12px; background: linear-gradient(135deg, #3498db, #2980b9);">Add</button>
+                </div>
+                <div id="friendRequestStatus" style="color: #888; font-size: 11px; margin-top: 5px;"></div>
+            </div>
+            <div id="pendingRequestsSection" style="margin-bottom: 15px; display: none;">
+                <h3 style="color: #e67e22; font-size: 13px; margin-bottom: 8px;">Pending Requests</h3>
+                <div id="pendingRequestsList"></div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <h3 style="color: #2ecc71; font-size: 13px; margin-bottom: 8px;">Friends List</h3>
+                <div id="friendsListContainer"></div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <h3 style="color: #9b59b6; font-size: 13px; margin-bottom: 8px;">Friends Servers</h3>
+                <button class="menu-btn" onclick="createFriendsServer()" style="width: 100%; padding: 8px; font-size: 12px; background: linear-gradient(135deg, #9b59b6, #8e44ad); margin-bottom: 8px;">Create Friends Server</button>
+                <div id="friendsServersList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOB Age Gate Modal -->
+    <div id="dobModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 500; justify-content: center; align-items: center;">
+        <div class="modal-content dob-modal-content" style="max-width: 380px;">
+            <h3 style="color: #3498db; margin-bottom: 10px;">Age Verification</h3>
+            <p style="color: #aaa; font-size: 12px; margin-bottom: 15px;">Voice chat requires age verification. Please enter your date of birth.</p>
+            <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 15px;">
+                <select id="dobMonth" class="dob-select"><option value="">Month</option></select>
+                <select id="dobDay" class="dob-select"><option value="">Day</option></select>
+                <select id="dobYear" class="dob-select"><option value="">Year</option></select>
+            </div>
+            <div id="dobError" style="color: #ff4444; font-size: 12px; margin-bottom: 10px; display: none;"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn buy" onclick="submitDobVerification()">Verify</button>
+                <button class="modal-btn cancel" onclick="closeDobModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="notificationContainer" style="position: fixed; top: 15px; right: 15px; z-index: 600; display: flex; flex-direction: column; gap: 8px; pointer-events: none; max-width: 320px;"></div>
 
     <!-- Inventory Management Panel -->
     <div id="inventoryPanel" class="panel" style="display: none; max-width: 600px;">
@@ -338,6 +396,23 @@
         let reconnectTimeout = null;
         let connectionTimeout = null;
         const CONNECTION_TIMEOUT_MS = 10000;
+        let isRetrying = false;
+
+        // Social / friends state
+        let socialSocket = null;
+        let myFriendCode = '';
+        let friendsList = [];
+        let pendingRequests = [];
+        let friendsServers = [];
+        let isFriendsPanelOpen = false;
+
+        // Voice chat state
+        let voiceChatEnabled = false;
+        let voiceChatMuted = false;
+        let localStream = null;
+        let peerConnections = {};
+        let audioContextVoice = null;
+        let localAnalyser = null;
 
         // Particle creation functions
         function createParticles(position, color, count, speed, size, lifetime, spread = 1) {
@@ -4709,8 +4784,36 @@
             attemptConnection();
         }
 
-        function attemptConnection() {
+        function scheduleRetry(detailsEl, reason) {
+            if (isRetrying) return;
+            if (connectionAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                handleConnectionFailure('Maximum retry attempts reached.');
+                return;
+            }
+            isRetrying = true;
+            const delay = INITIAL_RECONNECT_DELAY * Math.pow(2, connectionAttempts - 1);
+            if (detailsEl) detailsEl.textContent = `${reason} Retrying in ${delay / 1000}s...`;
+            reconnectTimeout = setTimeout(() => {
+                isRetrying = false;
+                attemptConnection();
+            }, delay);
+        }
+
+        function cleanupSocket() {
+            if (multiplayerSocket) {
+                multiplayerSocket.onopen = null;
+                multiplayerSocket.onmessage = null;
+                multiplayerSocket.onerror = null;
+                multiplayerSocket.onclose = null;
+                try { multiplayerSocket.close(); } catch (_e) { /* ignore */ }
+                multiplayerSocket = null;
+            }
+        }
+
+        function attemptConnection(url) {
+            const wsUrl = url || 'wss://game.hadijaffri.partykit.dev/parties/main/arena-main';
             connectionAttempts++;
+            isRetrying = false;
             const statusEl = document.getElementById('lobbyStatus');
             const detailsEl = document.getElementById('connectionDetails');
 
@@ -4722,37 +4825,50 @@
             statusEl.textContent = `Connecting to server... (Attempt ${connectionAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
             detailsEl.textContent = '';
 
-            // Clear any existing timeout
+            // Clear any existing timeouts
             if (connectionTimeout) {
                 clearTimeout(connectionTimeout);
                 connectionTimeout = null;
             }
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+
+            // Clean up any previous socket
+            cleanupSocket();
+
+            // Pre-flight check - detect server offline vs network issue
+            const httpUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+            fetch(httpUrl, { method: 'GET', mode: 'no-cors' }).catch(() => {
+                // If pre-flight fails, server might be offline - still attempt WebSocket
+                // but note it for the user
+                detailsEl.textContent = 'Server may be offline, attempting connection...';
+            });
 
             // Set connection timeout
             connectionTimeout = setTimeout(() => {
                 if (multiplayerSocket && multiplayerSocket.readyState !== WebSocket.OPEN) {
                     console.warn('Connection timeout after 10 seconds');
-                    multiplayerSocket.close();
-                    const delay = INITIAL_RECONNECT_DELAY * Math.pow(2, connectionAttempts - 1);
-                    detailsEl.textContent = `Connection timed out. Retrying in ${delay / 1000}s...`;
-                    reconnectTimeout = setTimeout(attemptConnection, delay);
+                    // Null out onclose before closing to prevent double-retry
+                    if (multiplayerSocket) multiplayerSocket.onclose = null;
+                    cleanupSocket();
+                    scheduleRetry(detailsEl, 'Connection timed out.');
                 }
             }, CONNECTION_TIMEOUT_MS);
 
             try {
-                // Connect to PartyKit server via native WebSocket
-                multiplayerSocket = new WebSocket('wss://game.hadijaffri.partykit.dev/parties/main/arena-main');
+                multiplayerSocket = new WebSocket(wsUrl);
 
                 multiplayerSocket.onopen = () => {
-                    // Clear timeout on successful connection
                     if (connectionTimeout) {
                         clearTimeout(connectionTimeout);
                         connectionTimeout = null;
                     }
                     connectionAttempts = 0;
+                    isRetrying = false;
                     document.getElementById('connectionDetails').textContent = '';
                     document.getElementById('lobbyStatus').textContent = 'Connected! Joining match...';
-                    // Send join message
                     multiplayerSocket.send(JSON.stringify({
                         type: 'join',
                         name: playerName,
@@ -4771,24 +4887,18 @@
 
                 multiplayerSocket.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    // Error will trigger close, which handles retry
                 };
 
-                multiplayerSocket.onclose = (event) => {
-                    // Clear connection timeout
+                multiplayerSocket.onclose = () => {
                     if (connectionTimeout) {
                         clearTimeout(connectionTimeout);
                         connectionTimeout = null;
                     }
 
                     if (isMultiplayer) {
-                        // Disconnected during game - try to reconnect
-                        handleDisconnectDuringGame(event);
+                        handleDisconnectDuringGame();
                     } else if (connectionAttempts <= MAX_RECONNECT_ATTEMPTS && document.getElementById('multiplayerLobby').style.display === 'flex') {
-                        // Still in lobby, retry connection
-                        const delay = INITIAL_RECONNECT_DELAY * Math.pow(2, connectionAttempts - 1);
-                        detailsEl.textContent = `Connection lost. Retrying in ${delay / 1000}s...`;
-                        reconnectTimeout = setTimeout(attemptConnection, delay);
+                        scheduleRetry(detailsEl, 'Connection lost.');
                     }
                 };
             } catch (e) {
@@ -4804,12 +4914,13 @@
             document.getElementById('retryConnectionBtn').style.display = 'block';
         }
 
-        function handleDisconnectDuringGame(event) {
+        function handleDisconnectDuringGame() {
             document.getElementById('lobbyStatus').textContent = 'Disconnected from server. Reconnecting...';
             document.getElementById('multiplayerLobby').style.display = 'flex';
             document.getElementById('connectionSpinner').style.display = 'block';
             document.getElementById('retryConnectionBtn').style.display = 'none';
             connectionAttempts = 0;
+            isRetrying = false;
             attemptConnection();
         }
 
@@ -4817,6 +4928,7 @@
             document.getElementById('retryConnectionBtn').style.display = 'none';
             document.getElementById('connectionSpinner').style.display = 'block';
             connectionAttempts = 0;
+            isRetrying = false;
             attemptConnection();
         }
 
@@ -4840,6 +4952,10 @@
                     if (data.player.id !== myPlayerId) {
                         createRemotePlayer(data.player);
                         addKillFeedMessage(`${data.player.name} joined the match`, '#00ff00');
+                        // Create voice peer connection if voice chat is active
+                        if (voiceChatEnabled) {
+                            createPeerConnection(data.player.id, true);
+                        }
                     }
                     updatePlayerCount();
                     break;
@@ -4847,6 +4963,13 @@
                 case 'player_left':
                     removeRemotePlayer(data.playerId);
                     addKillFeedMessage(`${data.playerName} left the match`, '#ff6600');
+                    // Clean up voice peer connection
+                    if (peerConnections[data.playerId]) {
+                        peerConnections[data.playerId].close();
+                        delete peerConnections[data.playerId];
+                    }
+                    const voiceInd = document.getElementById('voice-ind-' + data.playerId);
+                    if (voiceInd) voiceInd.remove();
                     updatePlayerCount();
                     break;
 
@@ -4909,6 +5032,18 @@
                 case 'chat_error':
                     addChatMessage('System', data.message, '#ff4444');
                     break;
+
+                case 'voice_offer':
+                    handleVoiceOffer(data.senderId, data.sdp);
+                    break;
+
+                case 'voice_answer':
+                    handleVoiceAnswer(data.senderId, data.sdp);
+                    break;
+
+                case 'voice_ice_candidate':
+                    handleVoiceIceCandidate(data.senderId, data.candidate);
+                    break;
             }
         }
 
@@ -4923,6 +5058,12 @@
             document.getElementById('multiplayerHUD').style.display = 'block';
             document.getElementById('statsPanel').style.display = 'none'; // Hide wave/score in MP
             document.getElementById('minimap').style.display = 'block';
+
+            // Show/hide voice chat button based on age verification
+            const voiceBtn = document.getElementById('voiceChatBtn');
+            if (voiceBtn) {
+                voiceBtn.style.display = getCookie('voiceChatAge') === 'under13' ? 'none' : 'flex';
+            }
 
             setupInput();
             showChatContainer();
@@ -5254,6 +5395,9 @@
             isMultiplayer = false;
             gameRunning = false;
 
+            // Disable voice chat
+            disableVoiceChat();
+
             // Clear any pending reconnect/timeout
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
@@ -5264,11 +5408,9 @@
                 connectionTimeout = null;
             }
             connectionAttempts = 0;
+            isRetrying = false;
 
-            if (multiplayerSocket) {
-                multiplayerSocket.close();
-                multiplayerSocket = null;
-            }
+            cleanupSocket();
 
             // Clean up remote players
             for (const playerId in remotePlayers) {
@@ -5309,11 +5451,9 @@
                 connectionTimeout = null;
             }
             connectionAttempts = 0;
+            isRetrying = false;
 
-            if (multiplayerSocket) {
-                multiplayerSocket.close();
-                multiplayerSocket = null;
-            }
+            cleanupSocket();
             document.getElementById('multiplayerLobby').style.display = 'none';
             document.getElementById('menu').style.display = 'flex';
         }
@@ -5421,6 +5561,657 @@
             const container = document.getElementById('chatContainer');
             if (container) container.style.display = 'none';
             if (isChatOpen) closeChatInput();
+        }
+
+        // ========== FRIENDS SYSTEM ==========
+
+        function connectToSocialServer() {
+            if (socialSocket && socialSocket.readyState === WebSocket.OPEN) return;
+
+            try {
+                socialSocket = new WebSocket('wss://game.hadijaffri.partykit.dev/parties/social/social-hub');
+
+                socialSocket.onopen = () => {
+                    socialSocket.send(JSON.stringify({
+                        type: 'register',
+                        deviceId: deviceId,
+                        username: playerName
+                    }));
+                };
+
+                socialSocket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleSocialMessage(data);
+                    } catch (e) {
+                        console.error('Error parsing social message:', e);
+                    }
+                };
+
+                socialSocket.onerror = (error) => {
+                    console.error('Social WebSocket error:', error);
+                };
+
+                socialSocket.onclose = () => {
+                    socialSocket = null;
+                };
+            } catch (e) {
+                console.error('Failed to connect to social server:', e);
+            }
+        }
+
+        function handleSocialMessage(data) {
+            switch (data.type) {
+                case 'registered':
+                    myFriendCode = data.friendCode;
+                    friendsList = data.friends || [];
+                    pendingRequests = data.pendingRequests || [];
+                    friendsServers = data.friendsServers || [];
+                    updateFriendsUI();
+                    break;
+
+                case 'friend_request_sent':
+                    document.getElementById('friendRequestStatus').textContent = 'Friend request sent!';
+                    document.getElementById('friendRequestStatus').style.color = '#2ecc71';
+                    document.getElementById('addFriendInput').value = '';
+                    break;
+
+                case 'friend_request_error':
+                    document.getElementById('friendRequestStatus').textContent = data.message;
+                    document.getElementById('friendRequestStatus').style.color = '#ff4444';
+                    break;
+
+                case 'friend_request_received':
+                    showFriendRequestToast(data.fromUsername, data.fromFriendCode, data.fromDeviceId);
+                    pendingRequests.push({ fromDeviceId: data.fromDeviceId, fromUsername: data.fromUsername, fromFriendCode: data.fromFriendCode });
+                    updatePendingRequestsUI();
+                    break;
+
+                case 'friend_request_accepted':
+                    showNotification(`${data.username} accepted your friend request!`, '#2ecc71');
+                    friendsList.push({ deviceId: data.deviceId, username: data.username, friendCode: data.friendCode, online: true });
+                    updateFriendsListUI();
+                    break;
+
+                case 'friends_updated':
+                    friendsList = data.friends || [];
+                    pendingRequests = data.pendingRequests || [];
+                    if (data.friendsServers) friendsServers = data.friendsServers;
+                    updateFriendsUI();
+                    break;
+
+                case 'friends_server_created':
+                    showNotification('Friends server created!', '#9b59b6');
+                    // Refresh servers list
+                    if (socialSocket && socialSocket.readyState === WebSocket.OPEN) {
+                        socialSocket.send(JSON.stringify({ type: 'get_friends', deviceId }));
+                    }
+                    break;
+
+                case 'friends_server_available':
+                    showNotification(`${data.hostUsername} started a friends server!`, '#9b59b6');
+                    friendsServers.push({ roomId: data.roomId, hostUsername: data.hostUsername, hostDeviceId: data.hostDeviceId });
+                    updateFriendsServersUI();
+                    break;
+
+                case 'friends_server_closed':
+                    friendsServers = friendsServers.filter(s => s.roomId !== data.roomId);
+                    updateFriendsServersUI();
+                    break;
+
+                case 'join_approved':
+                    joinFriendsServer(data.wsUrl);
+                    break;
+
+                case 'join_denied':
+                    showNotification(data.reason, '#ff4444');
+                    break;
+            }
+        }
+
+        function openFriendsPanel() {
+            isFriendsPanelOpen = true;
+            document.getElementById('friendsPanel').style.display = 'flex';
+            connectToSocialServer();
+        }
+
+        function closeFriendsPanel() {
+            isFriendsPanelOpen = false;
+            document.getElementById('friendsPanel').style.display = 'none';
+        }
+
+        function updateFriendsUI() {
+            document.getElementById('myFriendCode').textContent = myFriendCode;
+            updatePendingRequestsUI();
+            updateFriendsListUI();
+            updateFriendsServersUI();
+        }
+
+        function sendFriendRequest() {
+            const input = document.getElementById('addFriendInput');
+            const code = (input.value || '').trim();
+            if (!code) return;
+
+            if (!socialSocket || socialSocket.readyState !== WebSocket.OPEN) {
+                connectToSocialServer();
+                setTimeout(() => sendFriendRequest(), 1000);
+                return;
+            }
+
+            socialSocket.send(JSON.stringify({
+                type: 'send_friend_request',
+                deviceId: deviceId,
+                targetFriendCode: code
+            }));
+        }
+
+        function respondToFriendRequest(fromDeviceId, accept) {
+            if (!socialSocket || socialSocket.readyState !== WebSocket.OPEN) return;
+
+            socialSocket.send(JSON.stringify({
+                type: 'respond_friend_request',
+                deviceId: deviceId,
+                fromDeviceId: fromDeviceId,
+                accept: accept
+            }));
+
+            // Remove toast if exists
+            const toast = document.getElementById('toast-' + fromDeviceId);
+            if (toast) toast.remove();
+        }
+
+        function removeFriend(friendDeviceId) {
+            if (!socialSocket || socialSocket.readyState !== WebSocket.OPEN) return;
+
+            socialSocket.send(JSON.stringify({
+                type: 'remove_friend',
+                deviceId: deviceId,
+                friendDeviceId: friendDeviceId
+            }));
+        }
+
+        function updatePendingRequestsUI() {
+            const section = document.getElementById('pendingRequestsSection');
+            const list = document.getElementById('pendingRequestsList');
+            if (!section || !list) return;
+
+            if (pendingRequests.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            list.innerHTML = pendingRequests.map(r => `
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(230,126,34,0.1); border: 1px solid rgba(230,126,34,0.3); border-radius: 8px; padding: 8px; margin-bottom: 5px;">
+                    <div>
+                        <div style="color: white; font-size: 12px; font-weight: bold;">${r.fromUsername}</div>
+                        <div style="color: #888; font-size: 10px;">${r.fromFriendCode}</div>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <button onclick="respondToFriendRequest('${r.fromDeviceId}', true)" style="background: #2ecc71; color: white; border: none; border-radius: 5px; padding: 4px 10px; font-size: 11px; cursor: pointer;">Accept</button>
+                        <button onclick="respondToFriendRequest('${r.fromDeviceId}', false)" style="background: #e74c3c; color: white; border: none; border-radius: 5px; padding: 4px 10px; font-size: 11px; cursor: pointer;">Decline</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateFriendsListUI() {
+            const container = document.getElementById('friendsListContainer');
+            if (!container) return;
+
+            if (friendsList.length === 0) {
+                container.innerHTML = '<div style="color: #888; font-size: 12px; text-align: center;">No friends yet. Add someone using their friend code!</div>';
+                return;
+            }
+
+            container.innerHTML = friendsList.map(f => `
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.2); border-radius: 8px; padding: 8px; margin-bottom: 5px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background: ${f.online ? '#2ecc71' : '#888'};"></div>
+                        <div>
+                            <div style="color: white; font-size: 12px; font-weight: bold;">${f.username}</div>
+                            <div style="color: #888; font-size: 10px;">${f.friendCode}</div>
+                        </div>
+                    </div>
+                    <button onclick="removeFriend('${f.deviceId}')" style="background: none; border: 1px solid #e74c3c; color: #e74c3c; border-radius: 5px; padding: 3px 8px; font-size: 10px; cursor: pointer;">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function updateFriendsServersUI() {
+            const container = document.getElementById('friendsServersList');
+            if (!container) return;
+
+            if (friendsServers.length === 0) {
+                container.innerHTML = '<div style="color: #888; font-size: 12px; text-align: center;">No active friends servers.</div>';
+                return;
+            }
+
+            container.innerHTML = friendsServers.map(s => `
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(155,89,182,0.1); border: 1px solid rgba(155,89,182,0.3); border-radius: 8px; padding: 8px; margin-bottom: 5px;">
+                    <div>
+                        <div style="color: white; font-size: 12px; font-weight: bold;">${s.hostUsername}'s Server</div>
+                        <div style="color: #888; font-size: 10px;">Room: ${s.roomId}</div>
+                    </div>
+                    <button onclick="requestJoinFriendsServer('${s.roomId}')" class="menu-btn" style="padding: 5px 12px; font-size: 11px; background: linear-gradient(135deg, #9b59b6, #8e44ad);">Join</button>
+                </div>
+            `).join('');
+        }
+
+        function createFriendsServer() {
+            if (!socialSocket || socialSocket.readyState !== WebSocket.OPEN) {
+                showNotification('Not connected to social server.', '#ff4444');
+                return;
+            }
+
+            socialSocket.send(JSON.stringify({
+                type: 'create_friends_server',
+                deviceId: deviceId
+            }));
+        }
+
+        function requestJoinFriendsServer(roomId) {
+            if (!socialSocket || socialSocket.readyState !== WebSocket.OPEN) {
+                showNotification('Not connected to social server.', '#ff4444');
+                return;
+            }
+
+            socialSocket.send(JSON.stringify({
+                type: 'validate_join',
+                deviceId: deviceId,
+                roomId: roomId
+            }));
+        }
+
+        function joinFriendsServer(wsUrl) {
+            closeFriendsPanel();
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('multiplayerLobby').style.display = 'flex';
+            document.getElementById('retryConnectionBtn').style.display = 'none';
+            document.getElementById('connectionSpinner').style.display = 'block';
+            connectionAttempts = 0;
+            isRetrying = false;
+            attemptConnection(wsUrl);
+        }
+
+        function showFriendRequestToast(fromUsername, fromFriendCode, fromDeviceId) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.id = 'toast-' + fromDeviceId;
+            toast.className = 'friend-request-toast';
+            toast.style.pointerEvents = 'auto';
+            toast.innerHTML = `
+                <div style="font-size: 12px; font-weight: bold; color: #3498db; margin-bottom: 4px;">Friend Request</div>
+                <div style="font-size: 11px; color: white; margin-bottom: 2px;">${fromUsername}</div>
+                <div style="font-size: 10px; color: #888; margin-bottom: 8px;">${fromFriendCode}</div>
+                <div style="display: flex; gap: 5px;">
+                    <button onclick="respondToFriendRequest('${fromDeviceId}', true)" style="background: #2ecc71; color: white; border: none; border-radius: 5px; padding: 4px 12px; font-size: 11px; cursor: pointer;">Accept</button>
+                    <button onclick="respondToFriendRequest('${fromDeviceId}', false)" style="background: #e74c3c; color: white; border: none; border-radius: 5px; padding: 4px 12px; font-size: 11px; cursor: pointer;">Decline</button>
+                </div>
+            `;
+            container.appendChild(toast);
+
+            // Auto-remove after 30 seconds
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 30000);
+        }
+
+        function showNotification(message, color) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.style.pointerEvents = 'none';
+            toast.innerHTML = `<div style="font-size: 12px; color: ${color || '#fff'};">${message}</div>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // ========== DOB AGE GATE ==========
+
+        function initDobDropdowns() {
+            const monthSelect = document.getElementById('dobMonth');
+            const daySelect = document.getElementById('dobDay');
+            const yearSelect = document.getElementById('dobYear');
+
+            const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            months.forEach((m, i) => {
+                const opt = document.createElement('option');
+                opt.value = i + 1;
+                opt.textContent = m;
+                monthSelect.appendChild(opt);
+            });
+
+            for (let d = 1; d <= 31; d++) {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                daySelect.appendChild(opt);
+            }
+
+            const currentYear = new Date().getFullYear();
+            for (let y = currentYear; y >= currentYear - 100; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                yearSelect.appendChild(opt);
+            }
+        }
+
+        function openDobModal() {
+            initDobDropdowns();
+            document.getElementById('dobModal').style.display = 'flex';
+            document.getElementById('dobError').style.display = 'none';
+        }
+
+        function closeDobModal() {
+            document.getElementById('dobModal').style.display = 'none';
+        }
+
+        function submitDobVerification() {
+            const month = parseInt(document.getElementById('dobMonth').value);
+            const day = parseInt(document.getElementById('dobDay').value);
+            const year = parseInt(document.getElementById('dobYear').value);
+
+            if (!month || !day || !year) {
+                document.getElementById('dobError').textContent = 'Please fill in all fields.';
+                document.getElementById('dobError').style.display = 'block';
+                return;
+            }
+
+            const dob = new Date(year, month - 1, day);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                age--;
+            }
+
+            if (age < 13) {
+                setCookie('voiceChatAge', 'under13');
+                document.getElementById('dobError').textContent = 'You must be 13 or older to use voice chat.';
+                document.getElementById('dobError').style.display = 'block';
+                const voiceBtn = document.getElementById('voiceChatBtn');
+                if (voiceBtn) voiceBtn.style.display = 'none';
+                setTimeout(() => closeDobModal(), 2000);
+                return;
+            }
+
+            setCookie('voiceChatAge', 'verified');
+            closeDobModal();
+            enableVoiceChat();
+        }
+
+        // ========== VOICE CHAT ==========
+
+        function toggleVoiceChat() {
+            if (voiceChatEnabled) {
+                disableVoiceChat();
+            } else {
+                // Check age verification
+                const ageStatus = getCookie('voiceChatAge');
+                if (ageStatus === 'under13') {
+                    showNotification('Voice chat is not available.', '#ff4444');
+                    return;
+                }
+                if (ageStatus !== 'verified') {
+                    openDobModal();
+                    return;
+                }
+                enableVoiceChat();
+            }
+        }
+
+        async function enableVoiceChat() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                voiceChatEnabled = true;
+                voiceChatMuted = false;
+                updateVoiceChatButton();
+
+                // Set up audio monitoring for speaking indicator
+                audioContextVoice = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContextVoice.createMediaStreamSource(localStream);
+                localAnalyser = audioContextVoice.createAnalyser();
+                localAnalyser.fftSize = 256;
+                source.connect(localAnalyser);
+
+                // Create peer connections to all existing remote players
+                for (const playerId in remotePlayers) {
+                    createPeerConnection(playerId, true);
+                }
+
+                monitorAudioLevel();
+            } catch (e) {
+                console.error('Failed to enable voice chat:', e);
+                showNotification('Could not access microphone.', '#ff4444');
+            }
+        }
+
+        function disableVoiceChat() {
+            voiceChatEnabled = false;
+            voiceChatMuted = false;
+
+            // Stop local stream
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+
+            // Close all peer connections
+            for (const playerId in peerConnections) {
+                if (peerConnections[playerId]) {
+                    peerConnections[playerId].close();
+                }
+            }
+            peerConnections = {};
+
+            // Close audio context
+            if (audioContextVoice) {
+                audioContextVoice.close();
+                audioContextVoice = null;
+            }
+            localAnalyser = null;
+
+            updateVoiceChatButton();
+            clearVoiceIndicators();
+        }
+
+        function toggleMic() {
+            if (!voiceChatEnabled || !localStream) return;
+            voiceChatMuted = !voiceChatMuted;
+            localStream.getAudioTracks().forEach(t => { t.enabled = !voiceChatMuted; });
+            updateVoiceChatButton();
+        }
+
+        function updateVoiceChatButton() {
+            const btn = document.getElementById('voiceChatBtn');
+            if (!btn) return;
+
+            if (!voiceChatEnabled) {
+                btn.textContent = '🎤';
+                btn.className = 'voice-chat-btn';
+            } else if (voiceChatMuted) {
+                btn.textContent = '🔇';
+                btn.className = 'voice-chat-btn voice-muted';
+                btn.onclick = toggleMic;
+            } else {
+                btn.textContent = '🎤';
+                btn.className = 'voice-chat-btn voice-active';
+                btn.onclick = toggleMic;
+            }
+        }
+
+        function createPeerConnection(playerId, isInitiator) {
+            if (peerConnections[playerId]) return;
+
+            const pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
+
+            peerConnections[playerId] = pc;
+
+            // Add local stream tracks
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localStream);
+                });
+            }
+
+            // Handle incoming audio
+            pc.ontrack = (event) => {
+                const audio = new Audio();
+                audio.srcObject = event.streams[0];
+                audio.play();
+
+                // Monitor remote audio level
+                monitorRemoteAudio(playerId, event.streams[0]);
+            };
+
+            // ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate && multiplayerSocket && multiplayerSocket.readyState === WebSocket.OPEN) {
+                    multiplayerSocket.send(JSON.stringify({
+                        type: 'voice_ice_candidate',
+                        targetId: playerId,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+                    pc.close();
+                    delete peerConnections[playerId];
+                }
+            };
+
+            // If initiator, create offer
+            if (isInitiator) {
+                pc.createOffer().then(offer => {
+                    return pc.setLocalDescription(offer);
+                }).then(() => {
+                    if (multiplayerSocket && multiplayerSocket.readyState === WebSocket.OPEN) {
+                        multiplayerSocket.send(JSON.stringify({
+                            type: 'voice_offer',
+                            targetId: playerId,
+                            sdp: pc.localDescription
+                        }));
+                    }
+                }).catch(e => console.error('Offer creation failed:', e));
+            }
+        }
+
+        function handleVoiceOffer(senderId, sdp) {
+            if (!voiceChatEnabled) return;
+            createPeerConnection(senderId, false);
+            const pc = peerConnections[senderId];
+            if (!pc) return;
+
+            pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(() => {
+                return pc.createAnswer();
+            }).then(answer => {
+                return pc.setLocalDescription(answer);
+            }).then(() => {
+                if (multiplayerSocket && multiplayerSocket.readyState === WebSocket.OPEN) {
+                    multiplayerSocket.send(JSON.stringify({
+                        type: 'voice_answer',
+                        targetId: senderId,
+                        sdp: pc.localDescription
+                    }));
+                }
+            }).catch(e => console.error('Answer creation failed:', e));
+        }
+
+        function handleVoiceAnswer(senderId, sdp) {
+            const pc = peerConnections[senderId];
+            if (!pc) return;
+            pc.setRemoteDescription(new RTCSessionDescription(sdp))
+                .catch(e => console.error('Set remote description failed:', e));
+        }
+
+        function handleVoiceIceCandidate(senderId, candidate) {
+            const pc = peerConnections[senderId];
+            if (!pc) return;
+            pc.addIceCandidate(new RTCIceCandidate(candidate))
+                .catch(e => console.error('Add ICE candidate failed:', e));
+        }
+
+        function monitorAudioLevel() {
+            if (!voiceChatEnabled || !localAnalyser) return;
+
+            const data = new Uint8Array(localAnalyser.frequencyBinCount);
+            localAnalyser.getByteFrequencyData(data);
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+
+            const btn = document.getElementById('voiceChatBtn');
+            if (btn && voiceChatEnabled && !voiceChatMuted) {
+                if (avg > 30) {
+                    btn.style.boxShadow = '0 0 15px rgba(46, 204, 113, 0.8)';
+                } else {
+                    btn.style.boxShadow = '';
+                }
+            }
+
+            requestAnimationFrame(monitorAudioLevel);
+        }
+
+        function monitorRemoteAudio(playerId, stream) {
+            if (!audioContextVoice) return;
+
+            const source = audioContextVoice.createMediaStreamSource(stream);
+            const analyser = audioContextVoice.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+
+            function check() {
+                if (!peerConnections[playerId]) return;
+
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(data);
+                const avg = data.reduce((a, b) => a + b, 0) / data.length;
+
+                updateVoiceIndicator(playerId, avg > 30);
+                requestAnimationFrame(check);
+            }
+            check();
+        }
+
+        function updateVoiceIndicator(playerId, isSpeaking) {
+            const container = document.getElementById('voiceIndicators');
+            if (!container) return;
+
+            let indicator = document.getElementById('voice-ind-' + playerId);
+            const player = remotePlayers[playerId];
+            const name = player ? player.name : playerId.slice(0, 6);
+
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'voice-ind-' + playerId;
+                indicator.style.cssText = 'background: rgba(0,0,0,0.7); padding: 3px 8px; border-radius: 4px; font-size: 11px; display: flex; align-items: center; gap: 5px;';
+                indicator.innerHTML = `<span class="voice-dot"></span><span style="color: white;">${name}</span>`;
+                container.appendChild(indicator);
+            }
+
+            const dot = indicator.querySelector('.voice-dot');
+            if (dot) {
+                dot.style.cssText = `width: 8px; height: 8px; border-radius: 50%; background: ${isSpeaking ? '#2ecc71' : '#888'}; transition: background 0.2s;`;
+            }
+        }
+
+        function clearVoiceIndicators() {
+            const container = document.getElementById('voiceIndicators');
+            if (container) container.innerHTML = '';
         }
 
         // ========== END MULTIPLAYER FUNCTIONS ==========

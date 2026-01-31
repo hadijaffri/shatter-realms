@@ -104,9 +104,34 @@ export default class GameServer implements Party.Server {
         case 'chat':
           this.handleChat(sender, data);
           break;
+        case 'voice_offer':
+        case 'voice_answer':
+        case 'voice_ice_candidate':
+          this.relayVoiceSignal(sender, data);
+          break;
       }
     } catch (e) {
       console.error('Error parsing message:', e);
+    }
+  }
+
+  relayVoiceSignal(sender: Party.Connection, data: any) {
+    const targetId = data.targetId;
+    if (!targetId) return;
+
+    // Find target connection
+    for (const conn of this.room.getConnections()) {
+      if (conn.id === targetId) {
+        conn.send(
+          JSON.stringify({
+            type: data.type,
+            senderId: sender.id,
+            sdp: data.sdp,
+            candidate: data.candidate,
+          })
+        );
+        break;
+      }
     }
   }
 
