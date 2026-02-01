@@ -741,6 +741,113 @@
         #gameOver h1 { font-size: 38px; color: #ff4444; margin-bottom: 12px; }
         #gameOver p { color: #fff; font-size: 14px; margin: 4px 0; }
         
+        #playerNameInput:focus {
+            outline: none;
+            border-color: gold;
+        }
+
+        #chatInput:focus {
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
         .mobile-mode #hud { bottom: 150px; left: 8px; }
         .mobile-mode .bar-container { width: 140px; height: 16px; }
         .mobile-mode #hotbar { bottom: 75px; transform: translateX(-50%) scale(0.8); }
+
+        /* Voice Chat Button */
+        .voice-chat-btn {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.8);
+            border: 3px solid #3498db;
+            color: white;
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 120;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .voice-chat-btn:hover {
+            transform: scale(1.1);
+            border-color: #5dade2;
+        }
+
+        .voice-chat-btn.voice-active {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.2);
+        }
+
+        .voice-chat-btn.voice-active:hover {
+            border-color: #27ae60;
+        }
+
+        .voice-chat-btn.voice-muted {
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.2);
+        }
+
+        .voice-chat-btn.voice-muted:hover {
+            border-color: #c0392b;
+        }
+
+        /* Friend Request Toast */
+        .friend-request-toast {
+            background: rgba(10, 10, 30, 0.95);
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 12px;
+            animation: toastSlideIn 0.3s ease-out;
+        }
+
+        @keyframes toastSlideIn {
+            0% { transform: translateX(100%); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Notification Toast */
+        .notification-toast {
+            background: rgba(10, 10, 30, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px 15px;
+            animation: toastSlideIn 0.3s ease-out;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        /* DOB Modal Selects */
+        .dob-select {
+            padding: 8px;
+            font-size: 14px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background: #222;
+            color: white;
+            cursor: pointer;
+            min-width: 80px;
+        }
+
+        .dob-select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .dob-modal-content {
+            background: #1a1a2e;
+            border: 2px solid #3498db;
+        }
+
+        /* Voice Dot */
+        .voice-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #888;
+            transition: background 0.2s;
+        }

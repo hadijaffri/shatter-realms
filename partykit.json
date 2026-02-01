@@ -1,5 +1,8 @@
 {
   "name": "game",
   "main": "party/game.ts",
+  "parties": {
+    "social": "party/social.ts"
+  },
   "compatibilityDate": "2024-01-01"
 }
