@@ -3033,6 +3033,12 @@
                     return;
                 }
 
+                // ESC to return to menu during gameplay
+                if (e.code === 'Escape' && gameRunning) {
+                    backToMenu();
+                    return;
+                }
+
                 keys[e.code] = true;
                 if (e.code >= 'Digit1' && e.code <= 'Digit6') {
                     selectSlot(parseInt(e.code.replace('Digit', '')) - 1);
@@ -6758,6 +6764,14 @@
         }
         
         function backToMenu() {
+            gameRunning = false;
+
+            // Release pointer lock if active
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+
+            // Hide game UI
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('menu').style.display = 'flex';
             document.getElementById('hud').style.display = 'none';
@@ -6770,7 +6784,8 @@
 
             document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
             saveCoinsToCloud(); // Save coins when returning to menu
-            
+
+            // Clean up game objects
             enemies.forEach(e => scene.remove(e.mesh));
             enemies = [];
             if (boss) { scene.remove(boss.mesh); boss = null; }
@@ -6778,9 +6793,14 @@
             projectiles = [];
             coins.forEach(c => scene.remove(c.mesh));
             coins = [];
-            
+
             currentWave = 1;
             waveInProgress = false;
+
+            // If in multiplayer, leave the match
+            if (isMultiplayer) {
+                leaveMultiplayer();
+            }
         }
         
         window.addEventListener('resize', () => {
