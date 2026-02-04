@@ -380,10 +380,10 @@
             const colorCorrectionShader = {
                 uniforms: {
                     'tDiffuse': { value: null },
-                    'saturation': { value: 1.2 },
+                    'saturation': { value: 1.15 },
                     'contrast': { value: 1.1 },
-                    'brightness': { value: 0.05 },
-                    'vignetteIntensity': { value: 0.2 }
+                    'brightness': { value: 0.02 },
+                    'vignetteIntensity': { value: 0.3 }
                 },
                 vertexShader: `
                     varying vec2 vUv;
@@ -1133,19 +1133,20 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.6;
+            renderer.toneMappingExposure = 1.4;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.physicallyCorrectLights = true;
             document.body.appendChild(renderer.domElement);
+            renderer.domElement.style.display = 'none'; // Hide canvas until game starts
 
             // Hyper-realistic post-processing
             setupPostProcessing();
-            
+
             // Realistic lighting
-            const ambientLight = new THREE.AmbientLight(0x99aacc, 0.5);
+            const ambientLight = new THREE.AmbientLight(0x8899aa, 0.4);
             scene.add(ambientLight);
-            
-            const sunLight = new THREE.DirectionalLight(0xffffee, 1.1);
+
+            const sunLight = new THREE.DirectionalLight(0xffeedd, 1.0);
             sunLight.position.set(60, 100, 40);
             sunLight.castShadow = true;
             const shadowRes = deviceMode === 'mobile' ? 1024 : 2048;
@@ -3029,6 +3030,16 @@
                         sendChatMessage();
                     } else if (e.code === 'Escape') {
                         closeChatInput();
+                    }
+                    return;
+                }
+
+                // ESC to return to menu
+                if (e.code === 'Escape' && gameRunning) {
+                    if (isMultiplayer) {
+                        leaveMultiplayer();
+                    } else {
+                        backToMenu();
                     }
                     return;
                 }
@@ -5132,6 +5143,7 @@
 
         function startMultiplayerGame() {
             isMultiplayer = true;
+            renderer.domElement.style.display = 'block';
             document.getElementById('multiplayerLobby').style.display = 'none';
             document.getElementById('menu').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
@@ -5523,7 +5535,9 @@
             hideChatContainer();
             hideDeathScreen();
 
-            // Show menu
+            // Hide canvas and show menu
+            renderer.domElement.style.display = 'none';
+            if (document.exitPointerLock) document.exitPointerLock();
             document.getElementById('menu').style.display = 'flex';
             document.getElementById('hud').style.display = 'none';
             document.getElementById('coinsDisplay').style.display = 'none';
@@ -6732,6 +6746,7 @@
 
         function startGame() {
             enterFullscreen();
+            renderer.domElement.style.display = 'block';
             document.getElementById('menu').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
             document.getElementById('coinsDisplay').style.display = 'block';
@@ -6788,6 +6803,9 @@
         }
         
         function backToMenu() {
+            gameRunning = false;
+            renderer.domElement.style.display = 'none';
+            if (document.exitPointerLock) document.exitPointerLock();
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('menu').style.display = 'flex';
             document.getElementById('hud').style.display = 'none';
