@@ -382,7 +382,7 @@
                     'tDiffuse': { value: null },
                     'saturation': { value: 1.1 },
                     'contrast': { value: 1.05 },
-                    'brightness': { value: 0.0 },
+                    'brightness': { value: 0.02 },
                     'vignetteIntensity': { value: 0.15 }
                 },
                 vertexShader: `
@@ -1100,6 +1100,18 @@
                 height *= distFromCenter / 30;
             }
 
+            // Flatten terrain under village cobblestone area (centered at 0, 12, radius 18)
+            const cobbleCenterZ = 12;
+            const cobbleRadius = 18;
+            const dxCobble = x;
+            const dzCobble = z - cobbleCenterZ;
+            const distFromCobble = Math.sqrt(dxCobble * dxCobble + dzCobble * dzCobble);
+            if (distFromCobble < cobbleRadius + 4) {
+                // Smooth blend: fully flat inside radius, gradual transition in 4-unit border
+                const blend = Math.max(0, Math.min(1, (distFromCobble - cobbleRadius) / 4));
+                height *= blend;
+            }
+
             return height;
         }
         
@@ -1133,7 +1145,7 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
+            renderer.toneMappingExposure = 1.25;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.physicallyCorrectLights = true;
             document.body.appendChild(renderer.domElement);
@@ -1232,6 +1244,7 @@
             scene.add(ground);
 
             // Village center cobblestone area
+            const cobbleCenterY = getTerrainHeight(0, 12);
             const cobbleGeo = new THREE.CircleGeometry(18, 32);
             const cobbleMat = new THREE.MeshStandardMaterial({
                 color: 0x6a6a6a,
@@ -1240,7 +1253,7 @@
             });
             const cobble = new THREE.Mesh(cobbleGeo, cobbleMat);
             cobble.rotation.x = -Math.PI / 2;
-            cobble.position.set(0, 0.03, 12);
+            cobble.position.set(0, cobbleCenterY + 0.03, 12);
             cobble.receiveShadow = true;
             scene.add(cobble);
 
@@ -1248,6 +1261,9 @@
             for (let s = 0; s < 80; s++) {
                 const angle = Math.random() * Math.PI * 2;
                 const radius = Math.random() * 16;
+                const stoneX = Math.cos(angle) * radius;
+                const stoneZ = 12 + Math.sin(angle) * radius;
+                const stoneY = getTerrainHeight(stoneX, stoneZ);
                 const stoneSize = 0.3 + Math.random() * 0.4;
                 const stoneGeo = new THREE.CylinderGeometry(stoneSize, stoneSize * 0.9, 0.08, 6);
                 const stoneMat = new THREE.MeshStandardMaterial({
@@ -1255,11 +1271,7 @@
                     roughness: 0.9
                 });
                 const stone = new THREE.Mesh(stoneGeo, stoneMat);
-                stone.position.set(
-                    Math.cos(angle) * radius,
-                    0.06,
-                    12 + Math.sin(angle) * radius
-                );
+                stone.position.set(stoneX, stoneY + 0.06, stoneZ);
                 stone.rotation.y = Math.random() * Math.PI;
                 stone.receiveShadow = true;
                 scene.add(stone);
@@ -2474,12 +2486,13 @@
 
         async function buyCoins(coinPackage) {
             try {
+                const userId = authenticatedUsername || deviceId;
                 const response = await fetch('/api/create-checkout-session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ coinPackage })
+                    body: JSON.stringify({ coinPackage, userId })
                 });
 
                 const data = await response.json();
@@ -2488,11 +2501,11 @@
                     // Redirect to Stripe Checkout
                     window.location.href = data.url;
                 } else {
-                    alert('Error creating checkout session');
+                    alert(data.error || 'Error creating checkout session');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                alert('Error connecting to payment service');
+                console.error('Checkout error:', error);
+                alert('Could not connect to payment service. Please check your connection and try again.');
             }
         }
 

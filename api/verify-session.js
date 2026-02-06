@@ -4,7 +4,10 @@ import { setCorsHeaders, handleOptions } from './_lib/cors.js';
 let stripe = null;
 function getStripe() {
   if (!stripe && process.env.STRIPE_SECRET_KEY) {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      timeout: 10000,
+      maxNetworkRetries: 2,
+    });
   }
   return stripe;
 }
@@ -44,9 +47,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid coin metadata' });
     }
 
-    return res.status(200).json({ coins });
+    return res.status(200).json({
+      coins,
+      userId: session.metadata.userId || session.client_reference_id || null,
+      packageType: session.metadata.packageType || null,
+    });
   } catch (error) {
-    console.error('Session verification error:', error);
+    console.error('Session verification error:', error.type || 'unknown', error.message);
     return res.status(400).json({ error: 'Invalid session' });
   }
 }
