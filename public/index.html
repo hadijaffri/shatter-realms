@@ -3635,12 +3635,42 @@
               hasCape: true, hasAura: false, scarCount: 2, scale: 1.1 }
         ];
 
+        // Check if position is inside or too close to a building
+        function isInsideBuilding(x, z, margin = 2) {
+            for (const b of buildings) {
+                const halfW = b.width / 2 + margin;
+                const halfD = b.depth / 2 + margin;
+                if (x > b.x - halfW && x < b.x + halfW &&
+                    z > b.z - halfD && z < b.z + halfD) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Get terrain height sampling multiple points to prevent clipping into hills
+        function getTerrainHeightForEnemy(x, z) {
+            return Math.max(
+                getTerrainHeight(x, z),
+                getTerrainHeight(x + 0.5, z),
+                getTerrainHeight(x - 0.5, z),
+                getTerrainHeight(x, z + 0.5),
+                getTerrainHeight(x, z - 0.5)
+            );
+        }
+
         function spawnEnemy() {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 18 + Math.random() * 12;
-            const x = playerState.position.x + Math.cos(angle) * distance;
-            const z = playerState.position.z + Math.sin(angle) * distance;
-            const terrainY = getTerrainHeight(x, z);
+            // Try to find a valid spawn position (not inside buildings)
+            let x, z, attempts = 0;
+            do {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 18 + Math.random() * 12;
+                x = playerState.position.x + Math.cos(angle) * distance;
+                z = playerState.position.z + Math.sin(angle) * distance;
+                attempts++;
+            } while (isInsideBuilding(x, z) && attempts < 10);
+
+            const terrainY = getTerrainHeightForEnemy(x, z);
 
             // Pick random enemy type
             const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
@@ -4149,10 +4179,16 @@
         }
         
         function spawnBoss() {
-            const angle = Math.random() * Math.PI * 2;
-            const x = playerState.position.x + Math.cos(angle) * 28;
-            const z = playerState.position.z + Math.sin(angle) * 28;
-            const terrainY = getTerrainHeight(x, z);
+            // Try to find a valid spawn position (not inside buildings)
+            let x, z, attempts = 0;
+            do {
+                const angle = Math.random() * Math.PI * 2;
+                x = playerState.position.x + Math.cos(angle) * 28;
+                z = playerState.position.z + Math.sin(angle) * 28;
+                attempts++;
+            } while (isInsideBuilding(x, z, 3) && attempts < 10);
+
+            const terrainY = getTerrainHeightForEnemy(x, z);
             
             // Create boss group
             const bossGroup = new THREE.Group();
@@ -4622,8 +4658,8 @@
                     }
                 }
                 
-                // Update Y position to terrain height (with offset to prevent leg clipping)
-                const terrainY = getTerrainHeight(e.mesh.position.x, e.mesh.position.z);
+                // Update Y position to terrain height (sample multiple points to prevent clipping into hills)
+                const terrainY = getTerrainHeightForEnemy(e.mesh.position.x, e.mesh.position.z);
                 e.mesh.position.y = terrainY + 0.4;
                 
                 // Animate arms and legs while moving
@@ -4673,8 +4709,8 @@
                 isMoving = true;
             }
             
-            // Update Y position to terrain height (with offset to prevent leg clipping)
-            const terrainY = getTerrainHeight(boss.mesh.position.x, boss.mesh.position.z);
+            // Update Y position to terrain height (sample multiple points to prevent clipping into hills)
+            const terrainY = getTerrainHeightForEnemy(boss.mesh.position.x, boss.mesh.position.z);
             boss.mesh.position.y = terrainY + 0.45;
             
             // Animate arms and legs
