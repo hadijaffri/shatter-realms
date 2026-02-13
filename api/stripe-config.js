@@ -20,5 +20,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     publishableKey: key,
+    adsensePublisherId: process.env.GOOGLE_ADSENSE_PUB_ID || null,
+    adsenseAdSlot: process.env.GOOGLE_ADSENSE_AD_SLOT || null,
   });
 }

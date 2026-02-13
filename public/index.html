@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ShatterRealms - Realism Edition</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1047791604360922"
+        crossorigin="anonymous"></script>
 </head>
 <body>
     <div id="menu">
@@ -6916,6 +6919,58 @@
         // Hide menu initially and start auth flow
         document.getElementById('menu').style.display = 'none';
         tryAutoLogin();
+    </script>
+
+    <!-- Google AdSense Banner Ad (Bottom) -->
+    <div id="ad-container" style="position: fixed; bottom: 0; left: 0; width: 100%; z-index: 9999; text-align: center; background: rgba(0,0,0,0.8); padding: 4px 0; display: none;">
+        <ins class="adsbygoogle"
+            style="display:inline-block;width:728px;max-width:100%;height:90px"
+            data-ad-client="ca-pub-1047791604360922"
+            data-ad-slot="8200255613"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+        <button onclick="document.getElementById('ad-container').style.display='none'" style="position:absolute;top:2px;right:10px;background:none;border:none;color:#888;font-size:16px;cursor:pointer;">&times;</button>
+    </div>
+    <script>
+        // Only show ad container when an ad actually loads
+        const adContainer = document.getElementById('ad-container');
+        let adLoaded = false;
+
+        function checkAdLoaded() {
+            const adEl = adContainer.querySelector('.adsbygoogle');
+            // AdSense fills the ins element with content when an ad loads
+            if (adEl && (adEl.dataset.adStatus === 'filled' || adEl.children.length > 0)) {
+                adLoaded = true;
+                if (document.getElementById('menu').style.display !== 'none') {
+                    adContainer.style.display = 'block';
+                }
+            } else {
+                adContainer.style.display = 'none';
+            }
+        }
+
+        // Check periodically until ad loads (AdSense can be slow)
+        const adCheckInterval = setInterval(function() {
+            checkAdLoaded();
+            if (adLoaded) clearInterval(adCheckInterval);
+        }, 1000);
+        // Stop checking after 30 seconds if no ad loads
+        setTimeout(function() { clearInterval(adCheckInterval); }, 30000);
+
+        // Hide during gameplay, show on menu (only if ad loaded)
+        if (typeof startGame === 'function') {
+            const _origStart = startGame;
+            startGame = function() {
+                adContainer.style.display = 'none';
+                return _origStart.apply(this, arguments);
+            };
+        }
+        if (typeof returnToMenu === 'function') {
+            const _origReturn = returnToMenu;
+            returnToMenu = function() {
+                if (adLoaded) adContainer.style.display = 'block';
+                return _origReturn.apply(this, arguments);
+            };
+        }
     </script>
 </body>
 </html>
