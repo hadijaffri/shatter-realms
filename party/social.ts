@@ -31,6 +31,9 @@ interface FriendsServer {
   active: boolean;
 }
 
+const FRIEND_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars
+const FRIEND_CODE_LENGTH = 8;
+
 // Password hashing using Web Crypto API (available in PartyKit/Cloudflare Workers)
 async function hashPassword(
   password: string,
@@ -125,11 +128,21 @@ function containsBlockedWord(username: string): boolean {
   return BLOCKED_WORDS.some(word => normalized.includes(word) || lower.includes(word));
 }
 
+function generateFastFriendCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(FRIEND_CODE_LENGTH));
+  let code = '';
+  for (let i = 0; i < FRIEND_CODE_LENGTH; i++) {
+    code += FRIEND_CODE_CHARS[bytes[i] & 31];
+  }
+  return code;
+}
+
 export default class SocialServer implements Party.Server {
   constructor(readonly room: Party.Room) {}
 
   // In-memory lookup of connected deviceId -> connection
   connections: Record<string, Party.Connection> = {};
+  authenticatedDevices: Record<string, boolean> = {};
 
   async onConnect(conn: Party.Connection, _ctx: Party.ConnectionContext) {
     // Wait for register message to associate deviceId
@@ -141,11 +154,75 @@ export default class SocialServer implements Party.Server {
     for (const [deviceId, c] of Object.entries(this.connections)) {
       if (c.id === conn.id) {
         delete this.connections[deviceId];
+        delete this.authenticatedDevices[deviceId];
         // Deactivate any friends servers this player hosts
         await this.deactivateHostedServers(deviceId);
         break;
       }
     }
+  }
+
+  requireAuthenticated(conn: Party.Connection, deviceId: string): boolean {
+    if (this.authenticatedDevices[deviceId]) return true;
+    conn.send(
+      JSON.stringify({
+        type: 'social_auth_required',
+        message: 'Log in or sign up to use friend codes and cloud-saved friends.',
+      })
+    );
+    return false;
+  }
+
+  async generateUniqueFriendCode(): Promise<string> {
+    for (let attempts = 0; attempts < 50; attempts++) {
+      const code = generateFastFriendCode();
+      const existing = await this.room.storage.get<string>(`code:${code}`);
+      if (!existing) return code;
+    }
+    throw new Error('Failed to generate unique friend code');
+  }
+
+  async getOrCreateCloudPlayerData(deviceId: string, username: string): Promise<PlayerSocialData> {
+    let playerData = await this.getPlayerData(deviceId);
+
+    if (!playerData) {
+      const friendCode = await this.generateUniqueFriendCode();
+      playerData = {
+        deviceId,
+        username,
+        friendCode,
+        friends: [],
+        pendingRequests: [],
+      };
+      await this.room.storage.put(`code:${friendCode}`, deviceId);
+      await this.savePlayerData(playerData);
+      return playerData;
+    }
+
+    const previousCode = playerData.friendCode;
+    let nextCode = previousCode;
+    if (!nextCode) {
+      nextCode = await this.generateUniqueFriendCode();
+    } else {
+      const mappedDeviceId = await this.room.storage.get<string>(`code:${nextCode}`);
+      if (mappedDeviceId && mappedDeviceId !== deviceId) {
+        nextCode = await this.generateUniqueFriendCode();
+      }
+    }
+
+    playerData.username = username;
+    playerData.friendCode = nextCode;
+
+    if (previousCode && previousCode !== nextCode) {
+      const previousMapping = await this.room.storage.get<string>(`code:${previousCode}`);
+      if (previousMapping === deviceId) {
+        await this.room.storage.delete(`code:${previousCode}`);
+      }
+    }
+
+    await this.room.storage.put(`code:${nextCode}`, deviceId);
+    await this.savePlayerData(playerData);
+    return playerData;
   }
 
   async onMessage(message: string, sender: Party.Connection) {
@@ -265,35 +342,8 @@ export default class SocialServer implements Party.Server {
 
     // Auto-register social data
     this.connections[deviceId] = conn;
-    let playerData = await this.getPlayerData(deviceId);
-    if (!playerData) {
-      let friendCode = this.generateFriendCode(username);
-      let attempts = 0;
-      while (attempts < 10) {
-        const existingCode = await this.room.storage.get<string>(`code:${friendCode}`);
-        if (!existingCode) break;
-        friendCode = this.generateFriendCode(username);
-        attempts++;
-      }
-      playerData = {
-        deviceId,
-        username,
-        friendCode,
-        friends: [],
-        pendingRequests: [],
-      };
-      await this.room.storage.put(`code:${friendCode}`, deviceId);
-    } else {
-      // Update username
-      if (playerData.username !== username) {
-        await this.room.storage.delete(`code:${playerData.friendCode}`);
-        const newCode = this.generateFriendCode(username);
-        playerData.username = username;
-        playerData.friendCode = newCode;
-        await this.room.storage.put(`code:${newCode}`, deviceId);
-      }
-    }
-    await this.savePlayerData(playerData);
+    this.authenticatedDevices[deviceId] = true;
+    const playerData = await this.getOrCreateCloudPlayerData(deviceId, username);
 
     const servers = await this.getActiveFriendsServers(deviceId);
 
@@ -348,7 +398,8 @@ export default class SocialServer implements Party.Server {
     // Load social data
     const actualDeviceId = account.deviceId;
     this.connections[actualDeviceId] = conn;
-    const playerData = await this.getPlayerData(actualDeviceId);
+    this.authenticatedDevices[actualDeviceId] = true;
+    const playerData = await this.getOrCreateCloudPlayerData(actualDeviceId, account.username);
     const servers = await this.getActiveFriendsServers(actualDeviceId);
 
     conn.send(
@@ -357,9 +408,9 @@ export default class SocialServer implements Party.Server {
         token,
         username: account.username,
         deviceId: actualDeviceId,
-        friendCode: playerData?.friendCode || '',
-        friends: playerData ? await this.enrichFriendsList(playerData.friends) : [],
-        pendingRequests: playerData?.pendingRequests || [],
+        friendCode: playerData.friendCode,
+        friends: await this.enrichFriendsList(playerData.friends),
+        pendingRequests: playerData.pendingRequests,
         friendsServers: servers,
       })
     );
@@ -386,7 +437,8 @@ export default class SocialServer implements Party.Server {
     // Load social data
     const actualDeviceId = session.deviceId;
     this.connections[actualDeviceId] = conn;
-    const playerData = await this.getPlayerData(actualDeviceId);
+    this.authenticatedDevices[actualDeviceId] = true;
+    const playerData = await this.getOrCreateCloudPlayerData(actualDeviceId, session.username);
     const servers = await this.getActiveFriendsServers(actualDeviceId);
 
     conn.send(
@@ -395,9 +447,9 @@ export default class SocialServer implements Party.Server {
         token,
         username: session.username,
         deviceId: actualDeviceId,
-        friendCode: playerData?.friendCode || '',
-        friends: playerData ? await this.enrichFriendsList(playerData.friends) : [],
-        pendingRequests: playerData?.pendingRequests || [],
+        friendCode: playerData.friendCode,
+        friends: await this.enrichFriendsList(playerData.friends),
+        pendingRequests: playerData.pendingRequests,
         friendsServers: servers,
       })
     );
@@ -414,62 +466,22 @@ export default class SocialServer implements Party.Server {
   }
 
   generateFriendCode(_username: string): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+    return generateFastFriendCode();
   }
 
   async handleRegister(conn: Party.Connection, data: { deviceId: string; username: string }) {
-    const { deviceId, username } = data;
+    const { deviceId } = data;
     this.connections[deviceId] = conn;
-
-    let playerData = await this.getPlayerData(deviceId);
-    if (!playerData) {
-      // New player - generate friend code
-      let friendCode = this.generateFriendCode(username);
-      // Ensure uniqueness by checking storage
-      let attempts = 0;
-      while (attempts < 10) {
-        const existing = await this.room.storage.get<string>(`code:${friendCode}`);
-        if (!existing) break;
-        friendCode = this.generateFriendCode(username);
-        attempts++;
-      }
-      playerData = {
-        deviceId,
-        username,
-        friendCode,
-        friends: [],
-        pendingRequests: [],
-      };
-      await this.room.storage.put(`code:${friendCode}`, deviceId);
-    } else {
-      // Update username if changed
-      if (playerData.username !== username) {
-        // Remove old friend code mapping, create new one
-        await this.room.storage.delete(`code:${playerData.friendCode}`);
-        const newCode = this.generateFriendCode(username);
-        playerData.username = username;
-        playerData.friendCode = newCode;
-        await this.room.storage.put(`code:${newCode}`, deviceId);
-      }
-    }
-
-    await this.savePlayerData(playerData);
-
-    // Get active friends servers
-    const servers = await this.getActiveFriendsServers(deviceId);
+    this.authenticatedDevices[deviceId] = false;
 
     conn.send(
       JSON.stringify({
         type: 'registered',
-        friendCode: playerData.friendCode,
-        friends: await this.enrichFriendsList(playerData.friends),
-        pendingRequests: playerData.pendingRequests,
-        friendsServers: servers,
+        friendCode: '',
+        friends: [],
+        pendingRequests: [],
+        friendsServers: [],
+        guest: true,
       })
     );
   }
@@ -497,6 +509,7 @@ export default class SocialServer implements Party.Server {
     data: { deviceId: string; targetFriendCode: string }
   ) {
     const { deviceId, targetFriendCode } = data;
+    if (!this.requireAuthenticated(conn, deviceId)) return;
     const senderData = await this.getPlayerData(deviceId);
     if (!senderData) return;
 
@@ -569,6 +582,7 @@ export default class SocialServer implements Party.Server {
     data: { deviceId: string; fromDeviceId: string; accept: boolean }
   ) {
     const { deviceId, fromDeviceId, accept } = data;
+    if (!this.requireAuthenticated(conn, deviceId)) return;
     const playerData = await this.getPlayerData(deviceId);
     if (!playerData) return;
 
@@ -619,6 +633,7 @@ export default class SocialServer implements Party.Server {
     data: { deviceId: string; friendDeviceId: string }
   ) {
     const { deviceId, friendDeviceId } = data;
+    if (!this.requireAuthenticated(conn, deviceId)) return;
     const playerData = await this.getPlayerData(deviceId);
     if (!playerData) return;
 
@@ -642,6 +657,7 @@ export default class SocialServer implements Party.Server {
   }
 
   async handleGetFriends(conn: Party.Connection, data: { deviceId: string }) {
+    if (!this.requireAuthenticated(conn, data.deviceId)) return;
     const playerData = await this.getPlayerData(data.deviceId);
     if (!playerData) return;
 
@@ -659,6 +675,7 @@ export default class SocialServer implements Party.Server {
 
   async handleCreateFriendsServer(conn: Party.Connection, data: { deviceId: string }) {
     const { deviceId } = data;
+    if (!this.requireAuthenticated(conn, deviceId)) return;
     const playerData = await this.getPlayerData(deviceId);
     if (!playerData) return;
 
@@ -711,6 +728,7 @@ export default class SocialServer implements Party.Server {
     data: { deviceId: string; roomId: string }
   ) {
     const { deviceId, roomId } = data;
+    if (!this.requireAuthenticated(conn, deviceId)) return;
     const server = await this.room.storage.get<FriendsServer>(`server:${roomId}`);
     if (!server || server.hostDeviceId !== deviceId) return;
 
@@ -722,6 +740,7 @@ export default class SocialServer implements Party.Server {
 
   async handleValidateJoin(conn: Party.Connection, data: { deviceId: string; roomId: string }) {
     const { deviceId, roomId } = data;
+    if (!this.requireAuthenticated(conn, deviceId)) return;
     const server = await this.room.storage.get<FriendsServer>(`server:${roomId}`);
 
     if (!server || !server.active) {
