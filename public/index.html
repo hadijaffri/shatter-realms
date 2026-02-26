@@ -1114,7 +1114,26 @@
 
             return height;
         }
-        
+
+        const PLAYER_RADIUS = 0.35;
+        const TERRAIN_SLOPE_SAMPLE_STEP = 0.8;
+        const MAX_PLAYER_SLOPE = 0.10;
+        const MAX_AI_SLOPE = 0.08;
+
+        function getTerrainSlope(x, z, sampleStep = TERRAIN_SLOPE_SAMPLE_STEP) {
+            const hL = getTerrainHeight(x - sampleStep, z);
+            const hR = getTerrainHeight(x + sampleStep, z);
+            const hD = getTerrainHeight(x, z - sampleStep);
+            const hU = getTerrainHeight(x, z + sampleStep);
+            const gradX = (hR - hL) / (2 * sampleStep);
+            const gradZ = (hU - hD) / (2 * sampleStep);
+            return Math.sqrt(gradX * gradX + gradZ * gradZ);
+        }
+
+        function isSteepTerrain(x, z, maxSlope) {
+            return getTerrainSlope(x, z) > maxSlope;
+        }
+
         function init() {
             playerState = {
                 position: new THREE.Vector3(0, 1.7, 0),
@@ -3587,7 +3606,22 @@
         }
         
         function checkCollision(x, z) {
-            const r = 0.35;
+            const r = PLAYER_RADIUS;
+
+            // Terrain slope collision - block movement on steep hills
+            const slopeSamplePoints = [
+                [x, z],
+                [x + r, z],
+                [x - r, z],
+                [x, z + r],
+                [x, z - r]
+            ];
+            for (const [sx, sz] of slopeSamplePoints) {
+                if (isSteepTerrain(sx, sz, MAX_PLAYER_SLOPE)) {
+                    return true;
+                }
+            }
+
             for (const col of colliders) {
                 const dx = x - col.position.x;
                 const dz = z - col.position.z;
@@ -3650,7 +3684,7 @@
 
 
         function spawnEnemy() {
-            // Try to find a valid spawn position (not inside buildings)
+            // Try to find a valid spawn position (not inside buildings, not on steep slopes)
             let x, z, attempts = 0;
             do {
                 const angle = Math.random() * Math.PI * 2;
@@ -3658,7 +3692,7 @@
                 x = playerState.position.x + Math.cos(angle) * distance;
                 z = playerState.position.z + Math.sin(angle) * distance;
                 attempts++;
-            } while (isInsideBuilding(x, z) && attempts < 10);
+            } while ((isInsideBuilding(x, z) || isSteepTerrain(x, z, MAX_AI_SLOPE)) && attempts < 16);
 
             const terrainY = getTerrainHeight(x, z);
 
@@ -4617,8 +4651,8 @@
                     let newX = e.mesh.position.x + toPlayer.x * e.speed * dt;
                     let newZ = e.mesh.position.z + toPlayer.z * e.speed * dt;
 
-                    // Check collision with other enemies
-                    let canMove = true;
+                    // Check terrain slope - enemies can't climb steep hills
+                    let canMove = !isSteepTerrain(newX, newZ, MAX_AI_SLOPE);
                     enemies.forEach((other, otherIdx) => {
                         if (idx === otherIdx || !other.mesh) return;
 
