@@ -357,8 +357,9 @@
             outpost: { name: 'Outpost', cost: 120, width: 4.2, depth: 4.2, height: 2.6 }
         };
         const TERRAIN_SLOPE_SAMPLE_STEP = 0.8;
-        const MAX_PLAYER_SLOPE = 1.05;
-        const MAX_AI_SLOPE = 0.95;
+        const MAX_PLAYER_SLOPE = 0.72;
+        const MAX_AI_SLOPE = 0.62;
+        const MAX_PLAYER_STEP_UP = 0.2;
 
         // Post-processing composer for hyper-realistic graphics
         let composer = null;
@@ -3629,7 +3630,7 @@
             const newX = playerState.position.x + (wx / len) * 2;
             const newZ = playerState.position.z + (wz / len) * 2;
             
-            if (!checkCollision(newX, newZ)) {
+            if (canPlayerMoveTo(playerState.position.x, playerState.position.z, newX, newZ)) {
                 playerState.position.x = newX;
                 playerState.position.z = newZ;
             }
@@ -3645,8 +3646,19 @@
                 return true;
             }
 
-            if (checkSlope && isSteepTerrain(x, z, maxSlope)) {
-                return true;
+            if (checkSlope) {
+                const slopeSamplePoints = [
+                    [x, z],
+                    [x + radius, z],
+                    [x - radius, z],
+                    [x, z + radius],
+                    [x, z - radius]
+                ];
+                for (const [sx, sz] of slopeSamplePoints) {
+                    if (isSteepTerrain(sx, sz, maxSlope)) {
+                        return true;
+                    }
+                }
             }
 
             for (const col of colliders) {
@@ -3691,6 +3703,19 @@
                 maxSlope: MAX_AI_SLOPE,
                 checkSlope: true
             });
+        }
+
+        function isMoveBlockedByTerrainRise(fromX, fromZ, toX, toZ, maxStepUp = MAX_PLAYER_STEP_UP) {
+            const startY = getTerrainHeight(fromX, fromZ);
+            const endY = getTerrainHeight(toX, toZ);
+            const rise = endY - startY;
+            if (rise <= 0) return false;
+            return rise > maxStepUp;
+        }
+
+        function canPlayerMoveTo(fromX, fromZ, toX, toZ) {
+            if (isMoveBlockedByTerrainRise(fromX, fromZ, toX, toZ)) return false;
+            return !checkCollision(toX, toZ);
         }
 
         function updateBuildStatusUI() {
@@ -4804,15 +4829,20 @@
             const worldMoveZ = mz * cos - mx * sin;
             
             const moveAmount = speed * dt;
-            const newX = playerState.position.x + worldMoveX * moveAmount;
-            const newZ = playerState.position.z + worldMoveZ * moveAmount;
+            const currX = playerState.position.x;
+            const currZ = playerState.position.z;
+            const newX = currX + worldMoveX * moveAmount;
+            const newZ = currZ + worldMoveZ * moveAmount;
             
-            if (!checkCollision(newX, newZ)) {
+            if (canPlayerMoveTo(currX, currZ, newX, newZ)) {
                 playerState.position.x = newX;
                 playerState.position.z = newZ;
             } else {
-                if (!checkCollision(newX, playerState.position.z)) playerState.position.x = newX;
-                else if (!checkCollision(playerState.position.x, newZ)) playerState.position.z = newZ;
+                if (canPlayerMoveTo(currX, currZ, newX, currZ)) {
+                    playerState.position.x = newX;
+                } else if (canPlayerMoveTo(currX, currZ, currX, newZ)) {
+                    playerState.position.z = newZ;
+                }
             }
             
             playerState.position.x = Math.max(-120, Math.min(120, playerState.position.x));
