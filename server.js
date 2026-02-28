@@ -7,6 +7,7 @@ const path = require('path');
 
 const PORT = 8000;
 const DATA_FILE = path.join(__dirname, 'playerdata.json');
+const COMMENTS_FILE = path.join(__dirname, 'comments.json');
 
 // Initialize Stripe
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -22,6 +23,10 @@ console.log('Stripe configured successfully!');
 // Initialize data file if it doesn't exist
 if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ coins: 100 }));
+}
+
+if (!fs.existsSync(COMMENTS_FILE)) {
+  fs.writeFileSync(COMMENTS_FILE, JSON.stringify({ comments: [] }));
 }
 
 const server = http.createServer((req, res) => {
@@ -56,6 +61,68 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, coins: data.coins }));
       } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid data' }));
+      }
+    });
+    return;
+  }
+
+  if (req.url === '/api/comments' && req.method === 'GET') {
+    try {
+      const data = JSON.parse(fs.readFileSync(COMMENTS_FILE, 'utf8'));
+      const comments = Array.isArray(data.comments) ? data.comments.slice(0, 50) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ comments }));
+    } catch (_e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Could not load comments' }));
+    }
+    return;
+  }
+
+  if (req.url === '/api/comments' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => (body += chunk));
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const name = (payload.name || 'Guest')
+          .toString()
+          .replace(/[<>]/g, '')
+          .replace(/[^\w\s-]/g, '')
+          .trim()
+          .slice(0, 20) || 'Guest';
+        const message = (payload.message || '').toString().replace(/[<>]/g, '').trim().slice(0, 280);
+
+        if (!message) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Comment is required' }));
+          return;
+        }
+
+        let existing = [];
+        try {
+          const data = JSON.parse(fs.readFileSync(COMMENTS_FILE, 'utf8'));
+          existing = Array.isArray(data.comments) ? data.comments : [];
+        } catch (_e) {
+          existing = [];
+        }
+
+        const comment = {
+          id: 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
+          name,
+          message,
+          createdAt: new Date().toISOString(),
+        };
+
+        existing.unshift(comment);
+        const comments = existing.slice(0, 100);
+        fs.writeFileSync(COMMENTS_FILE, JSON.stringify({ comments }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, comment, comments: comments.slice(0, 50) }));
+      } catch (_e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid data' }));
       }

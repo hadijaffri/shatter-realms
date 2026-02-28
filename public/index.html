@@ -21,6 +21,7 @@
             <button class="menu-btn shop-btn" onclick="openShop()">🛒 Shop</button>
             <button class="menu-btn" onclick="openInventory()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">📦 Inventory</button>
             <button class="menu-btn" onclick="openFriendsPanel()" style="background: linear-gradient(135deg, #3498db, #2980b9);">👥 Friends</button>
+            <button class="menu-btn" onclick="openCommentsPanel()" style="background: linear-gradient(135deg, #f1c40f, #f39c12); color: #241800;">💬 Comments</button>
             <button class="menu-btn settings-btn" onclick="openSettings()">⚙️ Settings</button>
             <button class="menu-btn quit-btn" onclick="quitGame()">🚪 Quit</button>
             <div id="menuCoins" style="color: gold; margin-top: 12px; font-size: 16px;">💰 0 <button id="menuAddCoins" onclick="openCustomCoinModal()" style="background: gold; color: #000; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 16px; font-weight: bold; cursor: pointer; margin-left: 5px;">+</button></div>
@@ -41,6 +42,29 @@
             <button class="close-btn" onclick="closeSettings()">✕</button>
         </div>
         <div class="panel-content" id="settingsContent"></div>
+    </div>
+
+    <div id="commentsPanel" class="panel" style="display: none; max-width: 560px; border-color: #f1c40f;">
+        <div class="panel-header">
+            <h2 style="color: #f1c40f;">💬 COMMUNITY COMMENTS</h2>
+            <button class="close-btn" onclick="closeCommentsPanel()">✕</button>
+        </div>
+        <div class="panel-content">
+            <div style="color: #bbb; font-size: 11px; margin-bottom: 10px;">Share feedback, strategies, or map tips with other players.</div>
+            <div id="commentsStatus" style="color: #888; font-size: 11px; margin-bottom: 10px;">Loading comments...</div>
+            <div id="commentsList" style="max-height: 290px; overflow-y: auto; border: 1px solid rgba(241, 196, 15, 0.25); border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.25);"></div>
+            <div style="margin-top: 12px;">
+                <input id="commentNameInput" type="text" maxlength="20" placeholder="Your name" style="width: 100%; padding: 8px; font-size: 12px; border: 2px solid #444; border-radius: 8px; background: #222; color: white; margin-bottom: 8px;">
+                <textarea id="commentInput" maxlength="280" placeholder="Write a comment..." style="width: 100%; min-height: 70px; max-height: 150px; padding: 8px; resize: vertical; font-size: 12px; border: 2px solid #444; border-radius: 8px; background: #222; color: white;"></textarea>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                    <span id="commentCharCount" style="color: #888; font-size: 11px;">0 / 280</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="menu-btn" onclick="loadComments(true)" style="padding: 7px 12px; font-size: 11px; background: #556;">Refresh</button>
+                        <button id="postCommentBtn" class="menu-btn" onclick="submitComment()" style="padding: 7px 16px; font-size: 11px; background: linear-gradient(135deg, #f1c40f, #f39c12); color: #241800;">Post</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div id="mobileControls">
@@ -329,6 +353,17 @@
 
         // Game State
         let scene, camera, renderer, player;
+        let ground = null;
+        let ambientLight = null;
+        let sunLight = null;
+        let hemiLight = null;
+        let sunTarget = null;
+        let skyDome = null;
+        let skyUniforms = null;
+        let colorCorrectionPass = null;
+        let colorCorrectionUniforms = null;
+        let playerContactShadow = null;
+        let windTime = Math.random() * 1000;
         let gameRunning = false;
         let enemies = [];
         let projectiles = [];
@@ -341,6 +376,18 @@
         let swordMesh = null;
         let swordSwinging = false;
         let swordSwingTime = 0;
+        let cameraBobPhase = 0;
+        let cameraBreathPhase = Math.random() * Math.PI * 2;
+        let cameraLandingKick = 0;
+        let worldTime = Math.random();
+        let windReactiveFoliage = [];
+        let cloudLayer = [];
+        let atmosphericMist = [];
+        const skyColorTemp = new THREE.Color();
+        const fogColorTemp = new THREE.Color();
+        const topSkyTemp = new THREE.Color();
+        const horizonSkyTemp = new THREE.Color();
+        const bottomSkyTemp = new THREE.Color();
 
         // Post-processing composer for hyper-realistic graphics
         let composer = null;
@@ -383,7 +430,9 @@
                     'saturation': { value: 1.1 },
                     'contrast': { value: 1.05 },
                     'brightness': { value: 0.02 },
-                    'vignetteIntensity': { value: 0.15 }
+                    'vignetteIntensity': { value: 0.15 },
+                    'grainIntensity': { value: 0.018 },
+                    'temperature': { value: 0.02 }
                 },
                 vertexShader: `
                     varying vec2 vUv;
@@ -398,6 +447,8 @@
                     uniform float contrast;
                     uniform float brightness;
                     uniform float vignetteIntensity;
+                    uniform float grainIntensity;
+                    uniform float temperature;
                     varying vec2 vUv;
 
                     vec3 adjustSaturation(vec3 color, float sat) {
@@ -414,6 +465,10 @@
                         // Contrast and brightness
                         color.rgb = (color.rgb - 0.5) * contrast + 0.5 + brightness;
 
+                        // Basic warm/cool temperature shift
+                        color.r += temperature * 0.03;
+                        color.b -= temperature * 0.02;
+
                         // Vignette
                         vec2 center = vUv - 0.5;
                         float dist = length(center);
@@ -421,7 +476,7 @@
                         color.rgb *= vignette;
 
                         // Subtle film grain
-                        float grain = (fract(sin(dot(vUv * 1000.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.02;
+                        float grain = (fract(sin(dot(vUv * 1000.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainIntensity;
                         color.rgb += grain;
 
                         gl_FragColor = color;
@@ -429,9 +484,10 @@
                 `
             };
 
-            const colorPass = new THREE.ShaderPass(colorCorrectionShader);
-            colorPass.renderToScreen = true;
-            composer.addPass(colorPass);
+            colorCorrectionPass = new THREE.ShaderPass(colorCorrectionShader);
+            colorCorrectionPass.renderToScreen = true;
+            colorCorrectionUniforms = colorCorrectionPass.material.uniforms;
+            composer.addPass(colorCorrectionPass);
         }
 
         // Particle system
@@ -480,6 +536,12 @@
         let peerConnections = {};
         let audioContextVoice = null;
         let localAnalyser = null;
+
+        // Comments state
+        const COMMENTS_STORAGE_KEY = 'shatterCommentsV1';
+        const MAX_COMMENT_LENGTH = 280;
+        const MAX_COMMENT_NAME_LENGTH = 20;
+        let commentListCache = [];
 
         // Particle creation functions
         function createParticles(position, color, count, speed, size, lifetime, spread = 1) {
@@ -1117,8 +1179,10 @@
 
         const PLAYER_RADIUS = 0.35;
         const TERRAIN_SLOPE_SAMPLE_STEP = 0.8;
-        const MAX_PLAYER_SLOPE = 0.10;
+        const MAX_PLAYER_SLOPE = 0.15;
         const MAX_AI_SLOPE = 0.08;
+        const PLAYER_MOVE_SWEEP_STEP = 0.16;
+        const MAX_TERRAIN_STEP_UP = 0.35;
 
         function getTerrainSlope(x, z, sampleStep = TERRAIN_SLOPE_SAMPLE_STEP) {
             const hL = getTerrainHeight(x - sampleStep, z);
@@ -1132,6 +1196,295 @@
 
         function isSteepTerrain(x, z, maxSlope) {
             return getTerrainSlope(x, z) > maxSlope;
+        }
+
+        function getPlayerTerrainHeight(x, z) {
+            const r = PLAYER_RADIUS;
+            const samplePoints = [
+                [x, z],
+                [x + r, z],
+                [x - r, z],
+                [x, z + r],
+                [x, z - r],
+                [x + r * 0.7, z + r * 0.7],
+                [x + r * 0.7, z - r * 0.7],
+                [x - r * 0.7, z + r * 0.7],
+                [x - r * 0.7, z - r * 0.7]
+            ];
+
+            let highest = -Infinity;
+            for (const [sx, sz] of samplePoints) {
+                highest = Math.max(highest, getTerrainHeight(sx, sz));
+            }
+            return highest;
+        }
+
+        function tryMovePlayer(deltaX, deltaZ) {
+            if (deltaX === 0 && deltaZ === 0) return false;
+
+            const totalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+            const steps = Math.max(1, Math.ceil(totalDistance / PLAYER_MOVE_SWEEP_STEP));
+            const stepX = deltaX / steps;
+            const stepZ = deltaZ / steps;
+            let moved = false;
+
+            for (let i = 0; i < steps; i++) {
+                const nextX = playerState.position.x + stepX;
+                const nextZ = playerState.position.z + stepZ;
+
+                if (checkCollision(nextX, nextZ, playerState.position.x, playerState.position.z)) {
+                    return moved;
+                }
+
+                playerState.position.x = nextX;
+                playerState.position.z = nextZ;
+                moved = true;
+            }
+
+            return moved;
+        }
+
+        function movePlayerWithSliding(deltaX, deltaZ) {
+            if (deltaX === 0 && deltaZ === 0) return false;
+
+            const startX = playerState.position.x;
+            const startZ = playerState.position.z;
+
+            if (tryMovePlayer(deltaX, deltaZ)) {
+                return true;
+            }
+
+            playerState.position.x = startX;
+            playerState.position.z = startZ;
+            const movedX = tryMovePlayer(deltaX, 0);
+
+            if (!movedX) {
+                playerState.position.x = startX;
+                playerState.position.z = startZ;
+            }
+            const movedZ = tryMovePlayer(0, deltaZ);
+
+            return movedX || movedZ;
+        }
+
+        function sampleDetailNoise(x, y) {
+            let noise = 0;
+            noise += Math.sin(x * 0.11) * Math.cos(y * 0.09) * 0.45;
+            noise += Math.sin(x * 0.29 + 1.3) * 0.25;
+            noise += Math.cos(y * 0.23 - 0.7) * 0.2;
+            noise += Math.sin((x + y) * 0.41) * 0.1;
+            return noise * 0.5 + 0.5;
+        }
+
+        function createProceduralTerrainMaps(maxAnisotropy = 1) {
+            const size = 256;
+            const heights = new Float32Array(size * size);
+
+            const colorCanvas = document.createElement('canvas');
+            colorCanvas.width = size;
+            colorCanvas.height = size;
+            const colorCtx = colorCanvas.getContext('2d');
+            const colorImage = colorCtx.createImageData(size, size);
+
+            const roughCanvas = document.createElement('canvas');
+            roughCanvas.width = size;
+            roughCanvas.height = size;
+            const roughCtx = roughCanvas.getContext('2d');
+            const roughImage = roughCtx.createImageData(size, size);
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const i = y * size + x;
+                    const h = sampleDetailNoise(x / size * 32, y / size * 32);
+                    const moisture = sampleDetailNoise(x / size * 24 + 2.1, y / size * 24 - 3.7);
+                    heights[i] = h;
+
+                    const grassMix = Math.max(0, Math.min(1, h * 0.7 + moisture * 0.3));
+                    const dirtMix = 1 - grassMix;
+
+                    const r = Math.floor(54 * grassMix + 102 * dirtMix);
+                    const g = Math.floor(104 * grassMix + 78 * dirtMix);
+                    const b = Math.floor(52 * grassMix + 60 * dirtMix);
+
+                    const p = i * 4;
+                    colorImage.data[p] = r;
+                    colorImage.data[p + 1] = g;
+                    colorImage.data[p + 2] = b;
+                    colorImage.data[p + 3] = 255;
+
+                    const rough = Math.floor((0.62 + (1 - h) * 0.32) * 255);
+                    roughImage.data[p] = rough;
+                    roughImage.data[p + 1] = rough;
+                    roughImage.data[p + 2] = rough;
+                    roughImage.data[p + 3] = 255;
+                }
+            }
+            colorCtx.putImageData(colorImage, 0, 0);
+            roughCtx.putImageData(roughImage, 0, 0);
+
+            const normalCanvas = document.createElement('canvas');
+            normalCanvas.width = size;
+            normalCanvas.height = size;
+            const normalCtx = normalCanvas.getContext('2d');
+            const normalImage = normalCtx.createImageData(size, size);
+
+            const normalStrength = 6;
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const xm1 = (x - 1 + size) % size;
+                    const xp1 = (x + 1) % size;
+                    const ym1 = (y - 1 + size) % size;
+                    const yp1 = (y + 1) % size;
+
+                    const hL = heights[y * size + xm1];
+                    const hR = heights[y * size + xp1];
+                    const hD = heights[ym1 * size + x];
+                    const hU = heights[yp1 * size + x];
+
+                    const nx = (hL - hR) * normalStrength;
+                    const ny = 1.0;
+                    const nz = (hD - hU) * normalStrength;
+                    const invLen = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+
+                    const p = (y * size + x) * 4;
+                    normalImage.data[p] = Math.floor(((nx * invLen) * 0.5 + 0.5) * 255);
+                    normalImage.data[p + 1] = Math.floor(((ny * invLen) * 0.5 + 0.5) * 255);
+                    normalImage.data[p + 2] = Math.floor(((nz * invLen) * 0.5 + 0.5) * 255);
+                    normalImage.data[p + 3] = 255;
+                }
+            }
+            normalCtx.putImageData(normalImage, 0, 0);
+
+            const colorMap = new THREE.CanvasTexture(colorCanvas);
+            const normalMap = new THREE.CanvasTexture(normalCanvas);
+            const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+            [colorMap, normalMap, roughnessMap].forEach(tex => {
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(26, 26);
+                tex.anisotropy = maxAnisotropy;
+                tex.needsUpdate = true;
+            });
+
+            return { colorMap, normalMap, roughnessMap };
+        }
+
+        function createAtmosphere() {
+            skyUniforms = {
+                topColor: { value: new THREE.Color(0x5da3e0) },
+                horizonColor: { value: new THREE.Color(0x9ec7ea) },
+                bottomColor: { value: new THREE.Color(0xb0b8c5) },
+                sunColor: { value: new THREE.Color(0xffd08a) },
+                sunDirection: { value: new THREE.Vector3(0.2, 0.9, 0.1).normalize() },
+                haze: { value: 0.38 }
+            };
+
+            const skyMat = new THREE.ShaderMaterial({
+                side: THREE.BackSide,
+                depthWrite: false,
+                fog: false,
+                uniforms: skyUniforms,
+                vertexShader: `
+                    varying vec3 vWorldPosition;
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 topColor;
+                    uniform vec3 horizonColor;
+                    uniform vec3 bottomColor;
+                    uniform vec3 sunColor;
+                    uniform vec3 sunDirection;
+                    uniform float haze;
+                    varying vec3 vWorldPosition;
+
+                    void main() {
+                        vec3 viewDir = normalize(vWorldPosition);
+                        float h = clamp(viewDir.y * 0.5 + 0.5, 0.0, 1.0);
+                        vec3 sky = mix(bottomColor, horizonColor, smoothstep(0.0, 0.45, h));
+                        sky = mix(sky, topColor, smoothstep(0.35, 1.0, h));
+
+                        float sunAmount = max(dot(viewDir, normalize(sunDirection)), 0.0);
+                        float sunDisk = pow(sunAmount, 600.0);
+                        float sunGlow = pow(sunAmount, 8.0) * 0.3;
+                        sky += sunColor * (sunDisk + sunGlow);
+
+                        float hazeFactor = (1.0 - h) * haze;
+                        sky = mix(sky, horizonColor, hazeFactor);
+                        gl_FragColor = vec4(sky, 1.0);
+                    }
+                `
+            });
+
+            skyDome = new THREE.Mesh(new THREE.SphereGeometry(430, 32, 20), skyMat);
+            skyDome.frustumCulled = false;
+            scene.add(skyDome);
+
+            cloudLayer = [];
+            const cloudGeo = new THREE.PlaneGeometry(18, 11, 8, 4);
+            for (let i = 0; i < 30; i++) {
+                const cloudMat = new THREE.MeshLambertMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.2 + Math.random() * 0.08,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+                cloud.position.set((Math.random() - 0.5) * 300, 38 + Math.random() * 42, (Math.random() - 0.5) * 300);
+                cloud.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.18, 0, Math.random() * Math.PI * 2);
+                const scale = 0.7 + Math.random() * 1.5;
+                cloud.scale.set(scale, scale * (0.8 + Math.random() * 0.5), 1);
+                scene.add(cloud);
+                cloudLayer.push({
+                    mesh: cloud,
+                    speed: 0.008 + Math.random() * 0.02,
+                    driftAngle: Math.random() * Math.PI * 2,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+
+            atmosphericMist = [];
+            const mistGeo = new THREE.PlaneGeometry(24, 24);
+            for (let i = 0; i < 12; i++) {
+                const x = (Math.random() - 0.5) * 180;
+                const z = (Math.random() - 0.5) * 180;
+                const mistMat = new THREE.MeshBasicMaterial({
+                    color: 0xd5e4ef,
+                    transparent: true,
+                    opacity: 0.05 + Math.random() * 0.05,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const mist = new THREE.Mesh(mistGeo, mistMat);
+                mist.position.set(x, getTerrainHeight(x, z) + 0.08, z);
+                mist.rotation.x = -Math.PI / 2;
+                mist.rotation.z = Math.random() * Math.PI;
+                scene.add(mist);
+                atmosphericMist.push({
+                    mesh: mist,
+                    baseX: x,
+                    baseZ: z,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+
+            if (!playerContactShadow) {
+                const shadowGeo = new THREE.CircleGeometry(0.45, 16);
+                const shadowMat = new THREE.MeshBasicMaterial({
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.22,
+                    depthWrite: false
+                });
+                playerContactShadow = new THREE.Mesh(shadowGeo, shadowMat);
+                playerContactShadow.rotation.x = -Math.PI / 2;
+                playerContactShadow.renderOrder = 2;
+                scene.add(playerContactShadow);
+            }
         }
 
         function init() {
@@ -1164,7 +1517,7 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.25;
+            renderer.toneMappingExposure = 1.2;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.physicallyCorrectLights = true;
             document.body.appendChild(renderer.domElement);
@@ -1174,10 +1527,10 @@
             setupPostProcessing();
 
             // Realistic lighting
-            const ambientLight = new THREE.AmbientLight(0x8899aa, 0.4);
+            ambientLight = new THREE.AmbientLight(0x8899aa, 0.4);
             scene.add(ambientLight);
 
-            const sunLight = new THREE.DirectionalLight(0xffeedd, 1.0);
+            sunLight = new THREE.DirectionalLight(0xffeedd, 1.0);
             sunLight.position.set(60, 100, 40);
             sunLight.castShadow = true;
             const shadowRes = deviceMode === 'mobile' ? 1024 : 2048;
@@ -1191,9 +1544,16 @@
             sunLight.shadow.camera.bottom = -60;
             sunLight.shadow.bias = -0.0001;
             scene.add(sunLight);
+
+            sunTarget = new THREE.Object3D();
+            sunTarget.position.set(0, 0, 0);
+            scene.add(sunTarget);
+            sunLight.target = sunTarget;
             
-            const hemiLight = new THREE.HemisphereLight(0x88bbff, 0x445522, 0.5);
+            hemiLight = new THREE.HemisphereLight(0x88bbff, 0x445522, 0.5);
             scene.add(hemiLight);
+
+            const terrainMaps = createProceduralTerrainMaps(renderer.capabilities.getMaxAnisotropy());
             
             // Ground - realistic grass with hills (higher resolution)
             const groundGeo = new THREE.PlaneGeometry(250, 250, 120, 120);
@@ -1203,18 +1563,7 @@
             for (let i = 0; i < positions.count; i++) {
                 const x = positions.getX(i);
                 const y = positions.getY(i);
-                // Create rolling hills with more variation
-                let height = 0;
-                height += Math.sin(x * 0.02) * Math.cos(y * 0.02) * 3; // Large hills
-                height += Math.sin(x * 0.05) * Math.cos(y * 0.04) * 1.5; // Medium bumps
-                height += Math.sin(x * 0.1 + y * 0.1) * 0.3; // Small details
-                height += Math.sin(x * 0.15 + y * 0.08) * 0.15; // Micro details
-
-                // Flatten area near spawn
-                const distFromCenter = Math.sqrt(x * x + y * y);
-                if (distFromCenter < 30) {
-                    height *= distFromCenter / 30;
-                }
+                const height = getTerrainHeight(x, y);
 
                 positions.setZ(i, height);
 
@@ -1253,11 +1602,15 @@
 
             const groundMat = new THREE.MeshStandardMaterial({
                 vertexColors: true,
+                map: terrainMaps.colorMap,
+                normalMap: terrainMaps.normalMap,
+                roughnessMap: terrainMaps.roughnessMap,
                 roughness: 0.92,
-                metalness: 0,
+                metalness: 0.02,
                 flatShading: false
             });
-            const ground = new THREE.Mesh(groundGeo, groundMat);
+            groundMat.normalScale = new THREE.Vector2(0.35, 0.35);
+            ground = new THREE.Mesh(groundGeo, groundMat);
             ground.rotation.x = -Math.PI / 2;
             ground.receiveShadow = true;
             scene.add(ground);
@@ -1345,6 +1698,7 @@
             
             createEnvironment();
             createBuildings();
+            createAtmosphere();
             
             const playerGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.7, 16);
             const playerMat = new THREE.MeshStandardMaterial({ visible: false });
@@ -1412,6 +1766,7 @@
         
         function createEnvironment() {
             colliders = [];
+            windReactiveFoliage = [];
             
             // Trees - realistic
             for (let i = 0; i < 40; i++) {
@@ -1453,6 +1808,14 @@
                     foliage.position.set(x, terrainY + treeHeight * (0.4 + j * 0.14), z);
                     foliage.castShadow = true;
                     scene.add(foliage);
+
+                    windReactiveFoliage.push({
+                        mesh: foliage,
+                        baseRotX: foliage.rotation.x,
+                        baseRotZ: foliage.rotation.z,
+                        phase: Math.random() * Math.PI * 2,
+                        amplitude: 0.012 + Math.random() * 0.02
+                    });
                 }
             }
             
@@ -1509,6 +1872,14 @@
                 grass.rotation.y = Math.random() * Math.PI;
                 grass.rotation.x = -0.1;
                 scene.add(grass);
+
+                windReactiveFoliage.push({
+                    mesh: grass,
+                    baseRotX: grass.rotation.x,
+                    baseRotZ: grass.rotation.z,
+                    phase: Math.random() * Math.PI * 2,
+                    amplitude: 0.06 + Math.random() * 0.06
+                });
             }
         }
         
@@ -2598,6 +2969,11 @@
                     }, 300);
                 });
             }
+
+            const commentInput = document.getElementById('commentInput');
+            if (commentInput) {
+                commentInput.addEventListener('input', updateCommentCharCount);
+            }
         });
 
         async function calculateAIPrice(coins) {
@@ -3049,6 +3425,249 @@
 
         // Load saved hotbar on startup
         loadHotbar();
+
+        function sanitizeCommentName(rawName) {
+            const cleaned = (rawName || '')
+                .toString()
+                .replace(/[<>]/g, '')
+                .replace(/[^\w\s-]/g, '')
+                .trim()
+                .slice(0, MAX_COMMENT_NAME_LENGTH);
+            return cleaned || ('Guest_' + deviceId.slice(-4));
+        }
+
+        function sanitizeCommentMessage(rawMessage) {
+            return (rawMessage || '')
+                .toString()
+                .replace(/[<>]/g, '')
+                .trim()
+                .slice(0, MAX_COMMENT_LENGTH);
+        }
+
+        function getLocalComments() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(COMMENTS_STORAGE_KEY) || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (_e) {
+                return [];
+            }
+        }
+
+        function saveLocalComments(commentsToSave) {
+            try {
+                const normalized = (Array.isArray(commentsToSave) ? commentsToSave : []).slice(0, 60);
+                localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(normalized));
+            } catch (_e) {
+                // Ignore storage write errors (private mode / quota exceeded)
+            }
+        }
+
+        function formatCommentTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            if (Number.isNaN(date.getTime())) return 'just now';
+
+            const diffMs = Date.now() - date.getTime();
+            const diffMinutes = Math.floor(diffMs / 60000);
+            if (diffMinutes < 1) return 'just now';
+            if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+            const diffHours = Math.floor(diffMinutes / 60);
+            if (diffHours < 24) return `${diffHours}h ago`;
+
+            const diffDays = Math.floor(diffHours / 24);
+            if (diffDays < 7) return `${diffDays}d ago`;
+
+            return date.toLocaleDateString();
+        }
+
+        function setCommentsStatus(message, color = '#888') {
+            const statusEl = document.getElementById('commentsStatus');
+            if (!statusEl) return;
+            statusEl.style.color = color;
+            statusEl.textContent = message;
+        }
+
+        function updateCommentCharCount() {
+            const input = document.getElementById('commentInput');
+            const countEl = document.getElementById('commentCharCount');
+            if (!input || !countEl) return;
+            const current = input.value.length;
+            countEl.textContent = `${current} / ${MAX_COMMENT_LENGTH}`;
+            countEl.style.color = current > MAX_COMMENT_LENGTH * 0.9 ? '#f39c12' : '#888';
+        }
+
+        function renderComments(comments = []) {
+            const listEl = document.getElementById('commentsList');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+
+            if (!comments.length) {
+                const emptyEl = document.createElement('div');
+                emptyEl.style.cssText = 'color: #777; font-size: 12px; text-align: center; padding: 16px 8px;';
+                emptyEl.textContent = 'No comments yet. Be the first to post.';
+                listEl.appendChild(emptyEl);
+                return;
+            }
+
+            comments.forEach(comment => {
+                const itemEl = document.createElement('div');
+                itemEl.style.cssText = 'padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.08);';
+
+                const headerEl = document.createElement('div');
+                headerEl.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;';
+
+                const nameEl = document.createElement('span');
+                nameEl.style.cssText = 'font-size: 12px; color: #f1c40f; font-weight: bold;';
+                nameEl.textContent = comment.name || 'Guest';
+
+                const timeEl = document.createElement('span');
+                timeEl.style.cssText = 'font-size: 10px; color: #888;';
+                timeEl.textContent = formatCommentTimestamp(comment.createdAt);
+
+                headerEl.appendChild(nameEl);
+                headerEl.appendChild(timeEl);
+
+                const messageEl = document.createElement('div');
+                messageEl.style.cssText = 'margin-top: 3px; color: #ddd; font-size: 12px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;';
+                messageEl.textContent = comment.message || '';
+
+                itemEl.appendChild(headerEl);
+                itemEl.appendChild(messageEl);
+                listEl.appendChild(itemEl);
+            });
+        }
+
+        async function loadComments(forceRefresh = false) {
+            const panel = document.getElementById('commentsPanel');
+            if (!panel || panel.style.display === 'none') return;
+
+            if (!forceRefresh && commentListCache.length > 0) {
+                renderComments(commentListCache);
+                return;
+            }
+
+            setCommentsStatus('Loading comments...');
+            try {
+                const response = await fetch('/api/comments');
+                const data = await response.json();
+                const comments = Array.isArray(data.comments) ? data.comments : [];
+                commentListCache = comments.slice(0, 60);
+                saveLocalComments(commentListCache);
+                renderComments(commentListCache);
+                setCommentsStatus('Live comments loaded.', '#9aa3ad');
+            } catch (_e) {
+                commentListCache = getLocalComments();
+                renderComments(commentListCache);
+                setCommentsStatus('Offline mode: showing local comments only.', '#f39c12');
+            }
+        }
+
+        async function submitComment() {
+            const messageInput = document.getElementById('commentInput');
+            const nameInput = document.getElementById('commentNameInput');
+            const postBtn = document.getElementById('postCommentBtn');
+            if (!messageInput || !nameInput || !postBtn) return;
+
+            const message = sanitizeCommentMessage(messageInput.value);
+            if (!message) {
+                setCommentsStatus('Type a comment before posting.', '#ff6666');
+                return;
+            }
+
+            const name = sanitizeCommentName(authenticatedUsername || nameInput.value);
+            if (!authenticatedUsername) {
+                nameInput.value = name;
+                setCookie('commentName', name);
+            }
+
+            let filteredMessage = message;
+            postBtn.disabled = true;
+            postBtn.textContent = 'Posting...';
+
+            try {
+                const filterResponse = await fetch('/api/filter-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const filterData = await filterResponse.json();
+                filteredMessage = sanitizeCommentMessage(filterData.filtered || message);
+            } catch (_e) {
+                filteredMessage = message;
+            }
+
+            const payload = { name, message: filteredMessage };
+
+            try {
+                const response = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not post comment');
+                }
+
+                if (Array.isArray(data.comments)) {
+                    commentListCache = data.comments.slice(0, 60);
+                } else if (data.comment) {
+                    commentListCache = [data.comment, ...commentListCache].slice(0, 60);
+                }
+
+                saveLocalComments(commentListCache);
+                renderComments(commentListCache);
+                messageInput.value = '';
+                updateCommentCharCount();
+                setCommentsStatus('Comment posted.', '#2ecc71');
+            } catch (_e) {
+                const localComment = {
+                    id: 'local_' + Date.now(),
+                    name,
+                    message: filteredMessage,
+                    createdAt: new Date().toISOString()
+                };
+                commentListCache = [localComment, ...commentListCache].slice(0, 60);
+                saveLocalComments(commentListCache);
+                renderComments(commentListCache);
+                messageInput.value = '';
+                updateCommentCharCount();
+                setCommentsStatus('Posted locally (server unavailable).', '#f39c12');
+            } finally {
+                postBtn.disabled = false;
+                postBtn.textContent = 'Post';
+            }
+        }
+
+        function openCommentsPanel() {
+            const panel = document.getElementById('commentsPanel');
+            const nameInput = document.getElementById('commentNameInput');
+            if (!panel || !nameInput) return;
+
+            panel.style.display = 'flex';
+
+            if (authenticatedUsername) {
+                nameInput.value = authenticatedUsername;
+                nameInput.disabled = true;
+                nameInput.style.opacity = '0.7';
+                nameInput.title = 'Using your authenticated username';
+            } else {
+                const saved = sanitizeCommentName(getCookie('commentName') || nameInput.value);
+                nameInput.value = saved;
+                nameInput.disabled = false;
+                nameInput.style.opacity = '1';
+                nameInput.title = '';
+            }
+
+            updateCommentCharCount();
+            loadComments(true);
+        }
+
+        function closeCommentsPanel() {
+            const panel = document.getElementById('commentsPanel');
+            if (panel) panel.style.display = 'none';
+        }
 
         function openSettings() { generateSettingsUI(); document.getElementById('settingsPanel').style.display = 'flex'; }
         function closeSettings() { document.getElementById('settingsPanel').style.display = 'none'; }
@@ -3595,17 +4214,12 @@
 
             if (wx === 0 && wz === 0) return;
             const len = Math.sqrt(wx * wx + wz * wz);
-            
-            const newX = playerState.position.x + (wx / len) * 2;
-            const newZ = playerState.position.z + (wz / len) * 2;
-            
-            if (!checkCollision(newX, newZ)) {
-                playerState.position.x = newX;
-                playerState.position.z = newZ;
-            }
+            const dashDeltaX = (wx / len) * 2;
+            const dashDeltaZ = (wz / len) * 2;
+            movePlayerWithSliding(dashDeltaX, dashDeltaZ);
         }
         
-        function checkCollision(x, z) {
+        function checkCollision(x, z, prevX = playerState.position.x, prevZ = playerState.position.z) {
             const r = PLAYER_RADIUS;
 
             // Terrain slope collision - block movement on steep hills
@@ -3614,12 +4228,22 @@
                 [x + r, z],
                 [x - r, z],
                 [x, z + r],
-                [x, z - r]
+                [x, z - r],
+                [x + r * 0.7, z + r * 0.7],
+                [x + r * 0.7, z - r * 0.7],
+                [x - r * 0.7, z + r * 0.7],
+                [x - r * 0.7, z - r * 0.7]
             ];
             for (const [sx, sz] of slopeSamplePoints) {
                 if (isSteepTerrain(sx, sz, MAX_PLAYER_SLOPE)) {
                     return true;
                 }
+            }
+
+            const prevHeight = getPlayerTerrainHeight(prevX, prevZ);
+            const nextHeight = getPlayerTerrainHeight(x, z);
+            if (nextHeight - prevHeight > MAX_TERRAIN_STEP_UP) {
+                return true;
             }
 
             for (const col of colliders) {
@@ -4178,6 +4802,19 @@
             // Apply type-specific scale
             enemyGroup.scale.setScalar(type.scale);
 
+            const enemyShadow = new THREE.Mesh(
+                new THREE.CircleGeometry(0.5, 16),
+                new THREE.MeshBasicMaterial({
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.22,
+                    depthWrite: false
+                })
+            );
+            enemyShadow.rotation.x = -Math.PI / 2;
+            enemyShadow.position.y = 0.02;
+            enemyGroup.add(enemyShadow);
+
             enemyGroup.position.set(x, terrainY + 0.4, z);
             scene.add(enemyGroup);
 
@@ -4291,6 +4928,19 @@
             const rightLeg = new THREE.Mesh(legGeo, legMat);
             rightLeg.position.set(0.3, 0.45, 0);
             bossGroup.add(rightLeg);
+
+            const bossShadow = new THREE.Mesh(
+                new THREE.CircleGeometry(0.95, 20),
+                new THREE.MeshBasicMaterial({
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.28,
+                    depthWrite: false
+                })
+            );
+            bossShadow.rotation.x = -Math.PI / 2;
+            bossShadow.position.y = 0.02;
+            bossGroup.add(bossShadow);
             
             bossGroup.position.set(x, terrainY + 0.45, z);
             scene.add(bossGroup);
@@ -4557,23 +5207,18 @@
             const worldMoveZ = mz * cos - mx * sin;
             
             const moveAmount = speed * dt;
-            const newX = playerState.position.x + worldMoveX * moveAmount;
-            const newZ = playerState.position.z + worldMoveZ * moveAmount;
-            
-            if (!checkCollision(newX, newZ)) {
-                playerState.position.x = newX;
-                playerState.position.z = newZ;
-            } else {
-                if (!checkCollision(newX, playerState.position.z)) playerState.position.x = newX;
-                else if (!checkCollision(playerState.position.x, newZ)) playerState.position.z = newZ;
-            }
+            const deltaX = worldMoveX * moveAmount;
+            const deltaZ = worldMoveZ * moveAmount;
+            movePlayerWithSliding(deltaX, deltaZ);
             
             playerState.position.x = Math.max(-120, Math.min(120, playerState.position.x));
             playerState.position.z = Math.max(-120, Math.min(120, playerState.position.z));
             
             // Gravity and terrain following
-            const terrainY = getTerrainHeight(playerState.position.x, playerState.position.z);
+            const terrainY = getPlayerTerrainHeight(playerState.position.x, playerState.position.z);
             const groundY = terrainY + 1.7;
+            const wasGrounded = playerState.isGrounded;
+            const preGravityVelocityY = playerState.velocity.y;
             
             playerState.velocity.y -= 0.004;
             playerState.position.y += playerState.velocity.y;
@@ -4582,14 +5227,39 @@
                 playerState.position.y = groundY;
                 playerState.velocity.y = 0;
                 playerState.isGrounded = true;
+                if (!wasGrounded && preGravityVelocityY < -0.04) {
+                    cameraLandingKick = Math.min(0.09, Math.abs(preGravityVelocityY) * 0.35);
+                }
+            } else {
+                playerState.isGrounded = false;
             }
             
             if (deviceMode === 'computer' && keys['Space']) { jump(); keys['Space'] = false; }
             
             camera.position.copy(playerState.position);
+            cameraBreathPhase += dt * 0.0018;
+            cameraLandingKick = Math.max(0, cameraLandingKick - dt * 0.00035);
+
+            const moveIntensity = Math.min(1, Math.sqrt(mx * mx + mz * mz));
+            if (moveIntensity > 0.03 && playerState.isGrounded) {
+                cameraBobPhase += dt * (isSprint ? 0.022 : 0.016) * moveIntensity;
+            }
+
+            const bobY = playerState.isGrounded ? Math.sin(cameraBobPhase) * 0.025 * moveIntensity : 0;
+            const swayX = playerState.isGrounded ? Math.cos(cameraBobPhase * 0.5) * 0.01 * moveIntensity : 0;
+            const breatheY = Math.sin(cameraBreathPhase) * 0.004;
+
+            camera.position.x += swayX;
+            camera.position.y += bobY + breatheY - cameraLandingKick;
             camera.rotation.order = 'YXZ';
             camera.rotation.y = playerState.rotation.y;
             camera.rotation.x = playerState.rotation.x;
+            const targetRoll = -mx * 0.03 * moveIntensity;
+            camera.rotation.z += (targetRoll - camera.rotation.z) * 0.1;
+
+            const targetFov = isSprint && moveIntensity > 0.05 ? 74 : 70;
+            camera.fov += (targetFov - camera.fov) * 0.08;
+            camera.updateProjectionMatrix();
             
             if (player) player.position.copy(playerState.position);
             
@@ -4773,6 +5443,13 @@
 
                 let hitSomething = false;
 
+                const terrainY = getTerrainHeight(p.mesh.position.x, p.mesh.position.z);
+                if (p.mesh.position.y <= terrainY + 0.12) {
+                    createParticles(p.mesh.position.clone(), p.color || 0xffaa44, 6, 0.03, 0.05, 280, 0.8);
+                    p.life = 0;
+                    hitSomething = true;
+                }
+
                 enemies.forEach(e => {
                     if (!e.mesh || hitSomething) return;
                     if (p.mesh.position.distanceTo(e.mesh.position) < 0.9) {
@@ -4847,6 +5524,106 @@
                 playerState.energy = Math.min(playerState.maxEnergy, playerState.energy + dt * 0.002);
             }
         }
+
+        function updateRealismEnvironment(dt) {
+            if (!scene || !sunLight || !hemiLight || !ambientLight) return;
+
+            windTime += dt * 0.0007;
+            worldTime = (worldTime + dt * 0.00001) % 1;
+            const sunAngle = worldTime * Math.PI * 2 - Math.PI * 0.5;
+            const sunRaw = Math.sin(sunAngle);
+            const dayBlend = Math.max(0, sunRaw);
+            const twilightBlend = Math.max(0, 1 - Math.abs(sunRaw) * 1.6);
+
+            ambientLight.intensity = 0.08 + dayBlend * 0.33 + twilightBlend * 0.05;
+            hemiLight.intensity = 0.16 + dayBlend * 0.42;
+            sunLight.intensity = 0.08 + dayBlend * 1.2 + twilightBlend * 0.12;
+            sunLight.position.set(Math.cos(sunAngle) * 58, 18 + dayBlend * 105, Math.sin(sunAngle) * 43);
+            sunLight.color.setHSL(0.07 + dayBlend * 0.06, 0.58, 0.48 + dayBlend * 0.18);
+
+            if (sunTarget && playerState) {
+                const px = playerState.position.x;
+                const pz = playerState.position.z;
+                sunTarget.position.set(px, getTerrainHeight(px, pz) + 1, pz);
+            }
+
+            skyColorTemp.setHSL(0.59 - dayBlend * 0.11, 0.42, 0.15 + dayBlend * 0.5);
+            fogColorTemp.setHSL(0.58 - dayBlend * 0.09, 0.35, 0.12 + dayBlend * 0.4);
+            scene.background.lerp(skyColorTemp, 0.03);
+            scene.fog.color.lerp(fogColorTemp, 0.03);
+            scene.fog.density += ((0.0048 + (1 - dayBlend) * 0.0016) - scene.fog.density) * 0.06;
+
+            if (renderer) {
+                const targetExposure = 0.95 + dayBlend * 0.45 + twilightBlend * 0.08;
+                renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * 0.04;
+            }
+
+            if (bloomPass) {
+                const targetBloom = 0.08 + (1 - dayBlend) * 0.06;
+                bloomPass.strength += (targetBloom - bloomPass.strength) * 0.08;
+                bloomPass.threshold = 0.86 - twilightBlend * 0.1;
+            }
+
+            if (colorCorrectionUniforms) {
+                colorCorrectionUniforms.saturation.value = 1.05 + dayBlend * 0.1;
+                colorCorrectionUniforms.contrast.value = 1.03 + dayBlend * 0.06;
+                colorCorrectionUniforms.brightness.value = -0.02 + dayBlend * 0.05;
+                colorCorrectionUniforms.vignetteIntensity.value = 0.12 + (1 - dayBlend) * 0.09;
+                colorCorrectionUniforms.grainIntensity.value = 0.013 + (1 - dayBlend) * 0.013;
+                colorCorrectionUniforms.temperature.value = -0.01 + twilightBlend * 0.12;
+            }
+
+            if (skyUniforms) {
+                topSkyTemp.setHSL(0.59 - dayBlend * 0.12, 0.6, 0.22 + dayBlend * 0.35);
+                horizonSkyTemp.setHSL(0.58 - dayBlend * 0.09, 0.5, 0.3 + dayBlend * 0.42);
+                bottomSkyTemp.setHSL(0.57 - dayBlend * 0.05, 0.25, 0.18 + dayBlend * 0.22);
+                skyUniforms.topColor.value.copy(topSkyTemp);
+                skyUniforms.horizonColor.value.copy(horizonSkyTemp);
+                skyUniforms.bottomColor.value.copy(bottomSkyTemp);
+                skyUniforms.sunColor.value.setHSL(0.08 + twilightBlend * 0.04, 0.8, 0.5 + dayBlend * 0.35);
+                skyUniforms.sunDirection.value.set(Math.cos(sunAngle), 0.2 + dayBlend * 0.85, Math.sin(sunAngle)).normalize();
+                skyUniforms.haze.value = 0.25 + (1 - dayBlend) * 0.23;
+            }
+
+            for (let i = 0; i < windReactiveFoliage.length; i++) {
+                const foliage = windReactiveFoliage[i];
+                if (!foliage.mesh) continue;
+                const sway = Math.sin(windTime * 3 + foliage.phase) * foliage.amplitude;
+                foliage.mesh.rotation.x = foliage.baseRotX + sway * 0.65;
+                foliage.mesh.rotation.z = foliage.baseRotZ + sway;
+            }
+
+            for (let i = 0; i < cloudLayer.length; i++) {
+                const cloud = cloudLayer[i];
+                if (!cloud.mesh) continue;
+                cloud.mesh.position.x += Math.cos(cloud.driftAngle) * cloud.speed * dt;
+                cloud.mesh.position.z += Math.sin(cloud.driftAngle) * cloud.speed * dt;
+                if (cloud.mesh.position.x > 180) cloud.mesh.position.x = -180;
+                else if (cloud.mesh.position.x < -180) cloud.mesh.position.x = 180;
+                if (cloud.mesh.position.z > 180) cloud.mesh.position.z = -180;
+                else if (cloud.mesh.position.z < -180) cloud.mesh.position.z = 180;
+                const pulse = 0.04 * Math.sin(windTime * 1.1 + cloud.phase);
+                cloud.mesh.material.opacity = 0.14 + dayBlend * 0.11 + pulse;
+            }
+
+            for (let i = 0; i < atmosphericMist.length; i++) {
+                const mist = atmosphericMist[i];
+                if (!mist.mesh) continue;
+                const drift = Math.sin(windTime * 0.7 + mist.phase) * 2.8;
+                mist.mesh.position.x = mist.baseX + drift;
+                mist.mesh.position.z = mist.baseZ + Math.cos(windTime * 0.5 + mist.phase) * 2.2;
+                mist.mesh.material.opacity = 0.03 + (1 - dayBlend) * 0.07;
+            }
+
+            if (playerContactShadow && playerState) {
+                const shadowY = getTerrainHeight(playerState.position.x, playerState.position.z) + 0.04;
+                playerContactShadow.position.set(playerState.position.x, shadowY, playerState.position.z);
+                playerContactShadow.material.opacity = playerState.isGrounded ? 0.24 : 0.12;
+                const speed2D = Math.sqrt(playerState.velocity.x * playerState.velocity.x + playerState.velocity.z * playerState.velocity.z);
+                const stretch = 1 + Math.min(0.35, speed2D * 3.5);
+                playerContactShadow.scale.set(stretch, 1 / stretch, 1);
+            }
+        }
         
         let lastTime = 0;
         let lastSaveTime = 0;
@@ -4876,6 +5653,7 @@
             updateCoins(dt);
             updateCooldowns(dt);
             updateParticles(dt);
+            updateRealismEnvironment(dt);
             updateHUD();
             updateMinimap();
 
@@ -6826,6 +7604,7 @@
 
         function startGame() {
             enterFullscreen();
+            closeCommentsPanel();
             renderer.domElement.style.display = 'block';
             document.getElementById('menu').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
@@ -6857,6 +7636,8 @@
             playerState.score = 0;
             playerState.kills = 0;
             playerState.isGrounded = true;
+            cameraLandingKick = 0;
+            cameraBobPhase = 0;
             
             enemies.forEach(e => scene.remove(e.mesh));
             enemies = [];
@@ -6884,6 +7665,7 @@
         
         function backToMenu() {
             gameRunning = false;
+            closeCommentsPanel();
             renderer.domElement.style.display = 'none';
             if (document.exitPointerLock) document.exitPointerLock();
             document.getElementById('gameOver').style.display = 'none';
