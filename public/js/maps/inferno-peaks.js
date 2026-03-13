@@ -1,66 +1,27 @@
 /**
- * Inferno Peaks Map Module
- * Volcanic terrain with active hazards
- * UNIMPLEMENTED - Structural code only
+ * Inferno Peaks Map Configuration
+ * Volcanic terrain with jagged peaks and scorched earth
  */
 
-export class InfernoPeaksMap {
-  constructor(config = {}) {
-    this.id = 'inferno-peaks';
-    this.name = 'Inferno Peaks';
-    this.width = config.width || 300;
-    this.height = config.height || 300;
-  }
+export const config = {
+  id: 'inferno-peaks',
+  name: 'Inferno Peaks',
+  roomId: 'arena-inferno',
+  description: 'A treacherous volcanic landscape with jagged peaks and scorched earth.',
+  terrain: { hillScale: 1.8, hillAmp: 2.5, detailAmp: 0.4 },
+  fogColor: 0xff4400,
+  skyColor: 0x331100,
+  treeDensity: 3,
+  rockDensity: 60,
+  hasPlaza: false,
+  hasBuildings: false,
+  groundTint: { base: 0x5c3a2a, dark: 0x3b1f12, light: 0x7a4430, dirt: 0x8b2500 },
+  spawnPoints: [
+    { x: 50, y: 10, z: 50 },
+    { x: -50, y: 10, z: -50 },
+    { x: 50, y: 10, z: -50 },
+    { x: -50, y: 10, z: 50 },
+  ],
+};
 
-  /**
-   * Initialize lava flow systems
-   * TODO: Create procedural lava flow generation
-   */
-  initializeLavaFlows() {
-    // TODO: Generate lava flow path
-    // TODO: Create damage zones along paths
-    // TODO: Implement flow animation and propagation
-  }
-
-  /**
-   * Initialize geyser hazards
-   * TODO: Create geyser eruption mechanics
-   */
-  initializeGeysers() {
-    // TODO: Spawn geyser points across map
-    // TODO: Set eruption timers with randomization
-    // TODO: Create upward force when erupting
-  }
-
-  /**
-   * Create volcanic terrain mesh
-   * TODO: Generate rocky, cratered terrain
-   */
-  generateTerrain() {
-    // TODO: Create height map for volcanic landscape
-    // TODO: Add crater formations
-    // TODO: Texture with volcanic materials
-  }
-
-  /**
-   * Update volcanic hazards
-   * TODO: Cycle active hazards
-   */
-  update(deltaTime) {
-    // TODO: Update lava movement
-    // TODO: Check geyser eruption conditions
-    // TODO: Apply environmental damage
-  }
-
-  /**
-   * Check if position is in hazard zone
-   * TODO: Test position against lava flows and geysers
-   */
-  checkHazardCollision(position) {
-    // TODO: Test against lava zones
-    // TODO: Test against geyser blast radiuses
-    return false;
-  }
-}
-
-export default InfernoPeaksMap;
+export default config;

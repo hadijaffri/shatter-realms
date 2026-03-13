@@ -16,9 +16,9 @@
             <button class="menu-btn" onclick="selectDevice('mobile')">📱 Mobile</button>
         </div>
         <div id="startSection" style="display: none;">
-            <button class="menu-btn" onclick="startGame()">⚔️ Solo Play</button>
+            <button class="menu-btn" onclick="openSoloMapSelect()">⚔️ Solo Play</button>
             <button class="menu-btn" onclick="joinMultiplayer()" style="background: linear-gradient(135deg, #4a0080, #800080);">👥 Multiplayer</button>
-            <div id="mapSelectRow" style="margin: 10px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+            <div id="mapSelectRow" style="margin: 10px 0 6px; display: none; flex-direction: column; align-items: center; gap: 6px;">
                 <div style="color: #aaa; font-size: 12px;">Multiplayer Map</div>
                 <select id="mapSelect" style="padding: 6px 10px; font-size: 12px; border: 2px solid #444; border-radius: 8px; background: #222; color: white; width: 200px;"></select>
             </div>
@@ -323,6 +323,38 @@
         </div>
     </div>
 
+    <!-- Solo Map Selection Screen -->
+    <div id="soloMapSelect" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 350; overflow-y: auto;">
+        <div style="max-width: 800px; margin: 30px auto; padding: 20px;">
+            <h2 style="color: gold; text-align: center; margin-bottom: 20px;">SELECT YOUR MAP</h2>
+            <div id="soloMapGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;"></div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="menu-btn" onclick="closeSoloMapSelect()" style="background: #444;">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solo Map Confirm Dialog -->
+    <div id="soloMapConfirm" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 400; justify-content: center; align-items: center;">
+        <div class="modal-content" style="max-width: 380px; text-align: center;">
+            <h3 style="color: gold; margin-bottom: 10px;">Confirm Map</h3>
+            <p id="soloMapConfirmText" style="color: #ccc; font-size: 14px; margin-bottom: 20px;"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn buy" onclick="confirmSoloMap(true)">Yes</button>
+                <button class="modal-btn cancel" onclick="confirmSoloMap(false)">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multiplayer Map Vote Screen -->
+    <div id="multiplayerMapVote" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 350; overflow-y: auto;">
+        <div style="max-width: 800px; margin: 30px auto; padding: 20px;">
+            <h2 style="color: gold; text-align: center; margin-bottom: 5px;">VOTE FOR A MAP</h2>
+            <p id="voteTimer" style="color: #aaa; text-align: center; font-size: 13px; margin-bottom: 15px;">Voting ends in 15s...</p>
+            <div id="voteMapGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;"></div>
+        </div>
+    </div>
+
     <!-- Inventory Management Panel -->
     <div id="inventoryPanel" class="panel" style="display: none; max-width: 600px;">
         <div class="panel-header">
@@ -410,10 +442,17 @@
         let cameraBobPhase = 0;
         let cameraBreathPhase = Math.random() * Math.PI * 2;
         let cameraLandingKick = 0;
-        let worldTime = Math.random();
+        let worldTime = 0.15; // Start at early morning instead of random
         let windReactiveFoliage = [];
         let cloudLayer = [];
+        let playerFlashlight = null;
+        let isNightTime = false;
+        const DAY_CYCLE_MS = 300000; // 5 minutes total (2.5 day + 2.5 night)
+        const WORLD_TIME_RATE = 1 / DAY_CYCLE_MS; // worldTime increment per millisecond
         let atmosphericMist = [];
+        let plazaMeshes = [];
+        let pathMeshes = [];
+        let buildingMeshes = [];
         let realismUpdateAccumulator = 0;
         const skyColorTemp = new THREE.Color();
         const fogColorTemp = new THREE.Color();
@@ -532,6 +571,7 @@
         let myPlayerId = null;
         let matchTimeRemaining = 300000; // 5 minutes
         let lastPositionSync = 0;
+        let pendingGameState = null;
 
         // Network stress handler state
         let networkLatency = 0;
@@ -863,31 +903,236 @@
             updateFxaaResolution();
         }
 
+        const defaultTerrain = { hillScale: 1, hillAmp: 1, detailAmp: 1 };
+        const defaultGroundColors = { base: 0x4a7c3f, dark: 0x3a5c2f, light: 0x5a9c4f, dirt: 0x6b5344 };
+        const defaultFoliage = {
+            foliageHue: 0.28,
+            foliageSat: 0.45,
+            foliageLight: 0.28,
+            grassHue: 0.25,
+            grassSat: 0.5,
+            grassLight: 0.32,
+            trunkColor: 0x5d4037,
+            rockColor: 0x666666
+        };
+        const defaultLighting = {
+            ambientTint: 0x8899aa,
+            sunTint: 0xffeedd,
+            hemiSkyTint: 0x88bbff,
+            hemiGroundTint: 0x445522,
+            ambientMult: 1,
+            sunMult: 1,
+            hemiMult: 1,
+            sunTintStrength: 0.35
+        };
+        const defaultAtmosphere = {
+            fogColor: 0xb0c4de,
+            skyColor: 0x87ceeb,
+            fogDensityMult: 1,
+            skyBlend: 0.25,
+            fogBlend: 0.35,
+            cloudCount: 30,
+            mistCount: 12,
+            haze: 0.38,
+            cloudColor: 0xffffff,
+            mistColor: 0xd5e4ef
+        };
+
+        function buildMapConfig(map) {
+            const base = map || {};
+            const cfg = Object.assign({
+                terrain: defaultTerrain,
+                groundColors: defaultGroundColors,
+                foliage: defaultFoliage,
+                light: defaultLighting,
+                fogColor: defaultAtmosphere.fogColor,
+                skyColor: defaultAtmosphere.skyColor,
+                fogDensityMult: defaultAtmosphere.fogDensityMult,
+                skyBlend: defaultAtmosphere.skyBlend,
+                fogBlend: defaultAtmosphere.fogBlend,
+                cloudCount: defaultAtmosphere.cloudCount,
+                mistCount: defaultAtmosphere.mistCount,
+                haze: defaultAtmosphere.haze,
+                cloudColor: defaultAtmosphere.cloudColor,
+                mistColor: defaultAtmosphere.mistColor,
+                treeDensity: 40,
+                rockDensity: 25,
+                grassDensity: 200,
+                groundTint: 0xffffff,
+                groundEmissive: 0x000000,
+                groundEmissiveIntensity: 0,
+                hasPlaza: true,
+                hasBuildings: true,
+                hasPaths: true
+            }, base);
+            cfg.terrain = Object.assign({}, defaultTerrain, base.terrain || {});
+            cfg.groundColors = Object.assign({}, defaultGroundColors, base.groundColors || {});
+            cfg.foliage = Object.assign({}, defaultFoliage, base.foliage || {});
+            cfg.light = Object.assign({}, defaultLighting, base.light || {});
+            return cfg;
+        }
+
         const mapCatalog = [
-            {
-                id: 'village-arena', name: 'Village Arena', roomId: 'arena-village',
-                terrain: { hillScale: 1, hillAmp: 1, detailAmp: 1 },
-                fogColor: 0xb0c4de, skyColor: 0x87ceeb, treeDensity: 40, rockDensity: 50,
-                hasPlaza: true, hasBuildings: true
-            },
-            {
-                id: 'mountain-fortress', name: 'Mountain Fortress', roomId: 'arena-mountain',
-                terrain: { hillScale: 1.5, hillAmp: 2.0, detailAmp: 0.5 },
-                fogColor: 0x8899aa, skyColor: 0x6688aa, treeDensity: 15, rockDensity: 80,
-                hasPlaza: true, hasBuildings: false
-            },
-            {
-                id: 'desert-ruins', name: 'Desert Ruins', roomId: 'arena-desert',
-                terrain: { hillScale: 0.6, hillAmp: 0.5, detailAmp: 0.3 },
-                fogColor: 0xd4a574, skyColor: 0xdbb88a, treeDensity: 5, rockDensity: 30,
-                hasPlaza: false, hasBuildings: false
-            }
+            buildMapConfig({
+                id: 'ridge-plaza', name: 'Ridge Plaza', roomId: 'arena-ridge',
+                terrain: { hillScale: 1.0, hillAmp: 1.0, detailAmp: 1.0 },
+                fogColor: 0xb0c4de, skyColor: 0x87ceeb,
+                groundColors: { base: 0x4a7c3f, dark: 0x3a5c2f, light: 0x5a9c4f, dirt: 0x6b5344 },
+                treeDensity: 45, rockDensity: 30, grassDensity: 220,
+                hasPlaza: true, hasBuildings: true, hasPaths: true
+            }),
+            buildMapConfig({
+                id: 'stone-shelf', name: 'Stone Shelf', roomId: 'arena-shelf',
+                terrain: { hillScale: 0.85, hillAmp: 0.7, detailAmp: 0.6 },
+                fogColor: 0xaab3c2, skyColor: 0x8ea2b8,
+                groundColors: { base: 0x7a7a7a, dark: 0x5e5e5e, light: 0x909090, dirt: 0x665b50 },
+                treeDensity: 8, rockDensity: 90, grassDensity: 40,
+                light: { ambientTint: 0x7f8896, sunTint: 0xdde7ff, hemiSkyTint: 0x9fb3cc, hemiGroundTint: 0x494949, ambientMult: 0.9, sunMult: 0.9, hemiMult: 0.9, sunTintStrength: 0.35 },
+                hasPlaza: true, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'valley-run', name: 'Valley Run', roomId: 'arena-valley',
+                terrain: { hillScale: 1.2, hillAmp: 1.4, detailAmp: 1.1 },
+                fogColor: 0xa6cfd8, skyColor: 0x8fd3f4,
+                groundColors: { base: 0x3f7a3f, dark: 0x2f5c2f, light: 0x5f9a5f, dirt: 0x6a5845 },
+                treeDensity: 70, rockDensity: 20, grassDensity: 320,
+                hasPlaza: false, hasBuildings: false, hasPaths: true
+            }),
+            buildMapConfig({
+                id: 'inferno-peaks', name: 'Inferno Peaks', roomId: 'arena-inferno',
+                terrain: { hillScale: 1.4, hillAmp: 2.2, detailAmp: 0.5 },
+                fogColor: 0x4a1f14, skyColor: 0x5a2a18,
+                groundColors: { base: 0x4b2b1a, dark: 0x2a1a12, light: 0x6b3b22, dirt: 0x3b1f14 },
+                treeDensity: 0, rockDensity: 140, grassDensity: 0,
+                light: { ambientTint: 0x663322, sunTint: 0xffaa55, hemiSkyTint: 0x8b4b2a, hemiGroundTint: 0x33160f, ambientMult: 0.95, sunMult: 1.1, hemiMult: 0.9, sunTintStrength: 0.4 },
+                groundEmissive: 0x2a0a00, groundEmissiveIntensity: 0.15,
+                fogDensityMult: 1.2, haze: 0.55, cloudCount: 10, mistCount: 6,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'crystalline-cavern', name: 'Crystalline Cavern', roomId: 'arena-crystal',
+                terrain: { hillScale: 1.0, hillAmp: 0.8, detailAmp: 0.6 },
+                fogColor: 0x27365a, skyColor: 0x1b2033,
+                groundColors: { base: 0x2c3d5c, dark: 0x1b2538, light: 0x3f5c85, dirt: 0x223047 },
+                treeDensity: 0, rockDensity: 100, grassDensity: 0,
+                light: { ambientTint: 0x445b86, sunTint: 0x88aaff, hemiSkyTint: 0x5d7aa8, hemiGroundTint: 0x1b2233, ambientMult: 0.8, sunMult: 0.75, hemiMult: 0.8, sunTintStrength: 0.45 },
+                groundEmissive: 0x112244, groundEmissiveIntensity: 0.12,
+                fogDensityMult: 1.3, haze: 0.45, cloudCount: 0, mistCount: 6,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'frozen-tundra', name: 'Frozen Tundra', roomId: 'arena-frozen',
+                terrain: { hillScale: 0.9, hillAmp: 0.7, detailAmp: 0.5 },
+                fogColor: 0xb9d3e6, skyColor: 0xdbe9f7,
+                groundColors: { base: 0xcfdcf2, dark: 0xb4c4dd, light: 0xe3eefc, dirt: 0xa9b7c8 },
+                treeDensity: 12, rockDensity: 35, grassDensity: 60,
+                light: { ambientTint: 0xb7cbe0, sunTint: 0xe8f4ff, hemiSkyTint: 0xcadff5, hemiGroundTint: 0x7b8fa6, ambientMult: 0.95, sunMult: 0.9, hemiMult: 0.95, sunTintStrength: 0.35 },
+                fogDensityMult: 1.1, haze: 0.5, cloudCount: 40, mistCount: 18,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'shadow-abyss', name: 'Shadow Abyss', roomId: 'arena-shadow',
+                terrain: { hillScale: 0.7, hillAmp: 0.5, detailAmp: 0.3 },
+                fogColor: 0x1a1a2a, skyColor: 0x0b0b12,
+                groundColors: { base: 0x1b1b2b, dark: 0x0f0f18, light: 0x2a2a3f, dirt: 0x141423 },
+                treeDensity: 0, rockDensity: 15, grassDensity: 0,
+                light: { ambientTint: 0x4d3b6b, sunTint: 0x7d6ab3, hemiSkyTint: 0x5e4a8a, hemiGroundTint: 0x171121, ambientMult: 0.7, sunMult: 0.65, hemiMult: 0.7, sunTintStrength: 0.55 },
+                groundEmissive: 0x140a2a, groundEmissiveIntensity: 0.2,
+                fogDensityMult: 1.6, haze: 0.75, cloudCount: 0, mistCount: 4,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'sky-fortress', name: 'Sky Fortress', roomId: 'arena-sky',
+                terrain: { hillScale: 0.6, hillAmp: 0.4, detailAmp: 0.4 },
+                fogColor: 0xe7f3ff, skyColor: 0x9fd8ff,
+                groundColors: { base: 0xe5e8ee, dark: 0xc9ced8, light: 0xf6f8fc, dirt: 0xb3b9c4 },
+                treeDensity: 6, rockDensity: 12, grassDensity: 40,
+                light: { ambientTint: 0xe0edf7, sunTint: 0xffffff, hemiSkyTint: 0xcfe8ff, hemiGroundTint: 0x9bb3c8, ambientMult: 1.05, sunMult: 1.1, hemiMult: 1.0, sunTintStrength: 0.25 },
+                fogDensityMult: 0.8, haze: 0.55, cloudCount: 50, mistCount: 8,
+                hasPlaza: true, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'toxic-marsh', name: 'Toxic Marsh', roomId: 'arena-marsh',
+                terrain: { hillScale: 0.8, hillAmp: 0.9, detailAmp: 0.7 },
+                fogColor: 0x556b2f, skyColor: 0x6f8a4b,
+                groundColors: { base: 0x4f6334, dark: 0x364421, light: 0x6a7f42, dirt: 0x5a4d36 },
+                treeDensity: 30, rockDensity: 25, grassDensity: 260,
+                light: { ambientTint: 0x7f9a5a, sunTint: 0x9bbf6b, hemiSkyTint: 0x7ea15c, hemiGroundTint: 0x3b4a22, ambientMult: 0.9, sunMult: 0.85, hemiMult: 0.9, sunTintStrength: 0.4 },
+                fogDensityMult: 1.25, haze: 0.6, cloudCount: 25, mistCount: 20,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'ancient-temple', name: 'Ancient Temple', roomId: 'arena-temple',
+                terrain: { hillScale: 0.9, hillAmp: 0.8, detailAmp: 0.6 },
+                fogColor: 0xc9a774, skyColor: 0xe3c790,
+                groundColors: { base: 0xb89b6a, dark: 0x8c744f, light: 0xd7bb86, dirt: 0x927552 },
+                treeDensity: 18, rockDensity: 30, grassDensity: 120,
+                light: { ambientTint: 0xd4b47c, sunTint: 0xffe0a5, hemiSkyTint: 0xe6c98c, hemiGroundTint: 0x7f5f3a, ambientMult: 1.0, sunMult: 1.0, hemiMult: 0.95, sunTintStrength: 0.3 },
+                fogDensityMult: 1.0, haze: 0.42, cloudCount: 20, mistCount: 8,
+                hasPlaza: true, hasBuildings: false, hasPaths: true
+            }),
+            buildMapConfig({
+                id: 'shattered-isles', name: 'Shattered Isles', roomId: 'arena-isles',
+                terrain: { hillScale: 0.7, hillAmp: 0.6, detailAmp: 0.4 },
+                fogColor: 0x9fc3dd, skyColor: 0x8ab9da,
+                groundColors: { base: 0xcaa57a, dark: 0xa88763, light: 0xe1c39a, dirt: 0x8b7355 },
+                treeDensity: 6, rockDensity: 60, grassDensity: 30,
+                light: { ambientTint: 0xb7cfe2, sunTint: 0xf2f7ff, hemiSkyTint: 0xbdd6e9, hemiGroundTint: 0x7f735e, ambientMult: 1.0, sunMult: 1.0, hemiMult: 0.95, sunTintStrength: 0.25 },
+                fogDensityMult: 0.9, haze: 0.45, cloudCount: 35, mistCount: 10,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'neon-wasteland', name: 'Neon Wasteland', roomId: 'arena-neon',
+                terrain: { hillScale: 0.8, hillAmp: 0.7, detailAmp: 0.4 },
+                fogColor: 0x2b1533, skyColor: 0x1a0b24,
+                groundColors: { base: 0x1b1b1f, dark: 0x0f0f12, light: 0x2c2c35, dirt: 0x2a1f2d },
+                treeDensity: 0, rockDensity: 45, grassDensity: 0,
+                light: { ambientTint: 0x5c2d63, sunTint: 0xff77dd, hemiSkyTint: 0x7a3f8f, hemiGroundTint: 0x1c0f24, ambientMult: 0.85, sunMult: 0.8, hemiMult: 0.85, sunTintStrength: 0.55 },
+                groundEmissive: 0x2a0f3a, groundEmissiveIntensity: 0.25,
+                fogDensityMult: 1.2, haze: 0.5, cloudCount: 5, mistCount: 8,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'void-sanctum', name: 'Void Sanctum', roomId: 'arena-void',
+                terrain: { hillScale: 0.6, hillAmp: 0.6, detailAmp: 0.4 },
+                fogColor: 0x1a0f2d, skyColor: 0x0f071a,
+                groundColors: { base: 0x17121d, dark: 0x0c0912, light: 0x251b30, dirt: 0x1a1324 },
+                treeDensity: 0, rockDensity: 20, grassDensity: 0,
+                light: { ambientTint: 0x3b2a55, sunTint: 0x7a5fd1, hemiSkyTint: 0x4b3c7a, hemiGroundTint: 0x120b1b, ambientMult: 0.8, sunMult: 0.7, hemiMult: 0.8, sunTintStrength: 0.6 },
+                groundEmissive: 0x12091f, groundEmissiveIntensity: 0.2,
+                fogDensityMult: 1.5, haze: 0.7, cloudCount: 0, mistCount: 4,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            }),
+            buildMapConfig({
+                id: 'dragons-roost', name: "Dragon's Roost", roomId: 'arena-roost',
+                terrain: { hillScale: 1.0, hillAmp: 1.4, detailAmp: 0.7 },
+                fogColor: 0x8a5c2d, skyColor: 0x9b6233,
+                groundColors: { base: 0x7b5a2e, dark: 0x5a3f1f, light: 0xa77a3c, dirt: 0x4b3418 },
+                treeDensity: 5, rockDensity: 80, grassDensity: 40,
+                light: { ambientTint: 0x9d6a38, sunTint: 0xffc478, hemiSkyTint: 0xb07a46, hemiGroundTint: 0x402812, ambientMult: 0.95, sunMult: 1.05, hemiMult: 0.9, sunTintStrength: 0.4 },
+                groundEmissive: 0x2a1408, groundEmissiveIntensity: 0.08,
+                fogDensityMult: 1.1, haze: 0.5, cloudCount: 15, mistCount: 10,
+                hasPlaza: false, hasBuildings: false, hasPaths: false
+            })
         ];
         let selectedMapId = localStorage.getItem('selectedMapId') || mapCatalog[0].id;
-        let activeMapConfig = mapCatalog[0];
+        let activeMapConfig = getSelectedMapConfig();
+        const PLAZA_CONFIG = {
+            centerX: 0,
+            centerZ: 0,
+            half: 18,
+            slabY: 1.35,
+            slabThick: 0.6,
+            edgeBlend: 6,
+            floatClearance: 0.1
+        };
 
         function getSelectedMapConfig() {
-            return mapCatalog.find(m => m.id === selectedMapId) || mapCatalog[0];
+            const found = mapCatalog.find(m => m.id === selectedMapId);
+            if (found) return found;
+            selectedMapId = mapCatalog[0].id;
+            localStorage.setItem('selectedMapId', selectedMapId);
+            return mapCatalog[0];
         }
 
         function getSelectedMapRoomId() {
@@ -902,7 +1147,143 @@
             select.addEventListener('change', () => {
                 selectedMapId = select.value;
                 localStorage.setItem('selectedMapId', selectedMapId);
+                activeMapConfig = getSelectedMapConfig();
+                applyMapConfig(selectedMapId);
             });
+        }
+
+        // Solo map selection
+        let pendingSoloMapId = null;
+
+        function openSoloMapSelect() {
+            const grid = document.getElementById('soloMapGrid');
+            grid.innerHTML = mapCatalog.map(m => {
+                const skyHex = '#' + (m.skyColor || 0x87ceeb).toString(16).padStart(6, '0');
+                const fogHex = '#' + (m.fogColor || 0xb0c4de).toString(16).padStart(6, '0');
+                return `<div onclick="selectSoloMap('${m.id}')" style="cursor:pointer;padding:14px;border-radius:10px;border:2px solid #444;background:linear-gradient(135deg,${skyHex},${fogHex});text-align:center;transition:border-color 0.2s,transform 0.2s;" onmouseover="this.style.borderColor='gold';this.style.transform='scale(1.04)'" onmouseout="this.style.borderColor='#444';this.style.transform='scale(1)'">
+                    <div style="font-size:16px;font-weight:bold;color:white;text-shadow:1px 1px 3px #000;">${m.name}</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:4px;">Trees: ${m.treeDensity || 0} | Rocks: ${m.rockDensity || 0}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('soloMapSelect').style.display = 'block';
+        }
+
+        function closeSoloMapSelect() {
+            document.getElementById('soloMapSelect').style.display = 'none';
+        }
+
+        function selectSoloMap(mapId) {
+            pendingSoloMapId = mapId;
+            const map = mapCatalog.find(m => m.id === mapId);
+            document.getElementById('soloMapConfirmText').textContent =
+                'Are you sure you want to play in ' + (map ? map.name : mapId) + '?';
+            const confirmEl = document.getElementById('soloMapConfirm');
+            confirmEl.style.display = 'flex';
+        }
+
+        function confirmSoloMap(yes) {
+            document.getElementById('soloMapConfirm').style.display = 'none';
+            if (yes && pendingSoloMapId) {
+                selectedMapId = pendingSoloMapId;
+                localStorage.setItem('selectedMapId', selectedMapId);
+                activeMapConfig = getSelectedMapConfig();
+                applyMapConfig(selectedMapId);
+                closeSoloMapSelect();
+                startGame();
+            }
+            pendingSoloMapId = null;
+        }
+
+        // Multiplayer map voting
+        let mapVotes = {};
+        let myMapVote = null;
+        let voteCountdown = null;
+
+        function openMultiplayerMapVote() {
+            mapVotes = {};
+            myMapVote = null;
+            renderVoteGrid();
+            document.getElementById('multiplayerMapVote').style.display = 'block';
+            let timeLeft = 15;
+            const timerEl = document.getElementById('voteTimer');
+            timerEl.textContent = 'Voting ends in ' + timeLeft + 's...';
+            if (voteCountdown) clearInterval(voteCountdown);
+            voteCountdown = setInterval(() => {
+                timeLeft--;
+                timerEl.textContent = 'Voting ends in ' + timeLeft + 's...';
+                if (timeLeft <= 0) {
+                    clearInterval(voteCountdown);
+                    voteCountdown = null;
+                    resolveMapVote();
+                }
+            }, 1000);
+        }
+
+        function renderVoteGrid() {
+            const grid = document.getElementById('voteMapGrid');
+            const totalVotes = Object.values(mapVotes).reduce((s, v) => s + v, 0) || 0;
+            grid.innerHTML = mapCatalog.map(m => {
+                const votes = mapVotes[m.id] || 0;
+                const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+                const isMyVote = myMapVote === m.id;
+                const skyHex = '#' + (m.skyColor || 0x87ceeb).toString(16).padStart(6, '0');
+                const fogHex = '#' + (m.fogColor || 0xb0c4de).toString(16).padStart(6, '0');
+                const borderColor = isMyVote ? 'gold' : '#444';
+                return `<div onclick="castMapVote('${m.id}')" style="cursor:pointer;padding:14px;border-radius:10px;border:2px solid ${borderColor};background:linear-gradient(135deg,${skyHex},${fogHex});text-align:center;transition:border-color 0.2s,transform 0.2s;position:relative;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                    <div style="font-size:15px;font-weight:bold;color:white;text-shadow:1px 1px 3px #000;">${m.name}</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:6px;">${pct}% chance</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">${votes} vote${votes !== 1 ? 's' : ''}</div>
+                    ${isMyVote ? '<div style="position:absolute;top:4px;right:8px;color:gold;font-size:14px;">&#10003;</div>' : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function castMapVote(mapId) {
+            if (myMapVote) {
+                mapVotes[myMapVote] = Math.max(0, (mapVotes[myMapVote] || 0) - 1);
+            }
+            myMapVote = mapId;
+            mapVotes[mapId] = (mapVotes[mapId] || 0) + 1;
+            renderVoteGrid();
+            if (multiplayerSocket && multiplayerSocket.readyState === WebSocket.OPEN) {
+                multiplayerSocket.send(JSON.stringify({ type: 'mapVote', mapId: mapId }));
+            }
+        }
+
+        function handleRemoteMapVote(playerId, mapId, previousVote) {
+            if (previousVote && mapVotes[previousVote]) {
+                mapVotes[previousVote] = Math.max(0, mapVotes[previousVote] - 1);
+            }
+            mapVotes[mapId] = (mapVotes[mapId] || 0) + 1;
+            renderVoteGrid();
+        }
+
+        function resolveMapVote() {
+            document.getElementById('multiplayerMapVote').style.display = 'none';
+            let bestMap = mapCatalog[0].id;
+            let bestVotes = 0;
+            for (const [mapId, votes] of Object.entries(mapVotes)) {
+                if (votes > bestVotes) {
+                    bestVotes = votes;
+                    bestMap = mapId;
+                }
+            }
+            selectedMapId = bestMap;
+            localStorage.setItem('selectedMapId', selectedMapId);
+            activeMapConfig = getSelectedMapConfig();
+            applyMapConfig(selectedMapId);
+            // If game state was pending from server, start the game now
+            if (pendingGameState) {
+                const gs = pendingGameState;
+                pendingGameState = null;
+                startMultiplayerGame();
+                gs.players.forEach(p => {
+                    if (p.id !== myPlayerId) {
+                        createRemotePlayer(p);
+                    }
+                });
+                updatePlayerCount();
+            }
         }
         
         // Avatar items
@@ -1497,25 +1878,37 @@
                 height *= distFromCenter / 30;
             }
 
-            // Flatten terrain under stone plaza (only if map has plaza)
+            // Flatten and raise terrain under stone plaza so it sits on solid ground
             if (activeMapConfig.hasPlaza !== false) {
-                const plazaCenterZ = 20;
-                const plazaHalf = 18;
-                const plazaY = 1.2;
-                if (Math.abs(x) < plazaHalf + 4 && Math.abs(z - plazaCenterZ) < plazaHalf + 4) {
-                    const insideX = Math.abs(x) < plazaHalf;
-                    const insideZ = Math.abs(z - plazaCenterZ) < plazaHalf;
+                const plaza = PLAZA_CONFIG;
+                const dxp = x - plaza.centerX;
+                const dzp = z - plaza.centerZ;
+                const dist = Math.sqrt(dxp * dxp + dzp * dzp);
+
+                // Gentle mound under entire plaza so terrain rises to meet the slab
+                const moundRadius = plaza.half * 1.3;
+                if (dist < moundRadius) {
+                    const mound = 1 - dist / moundRadius;
+                    height += mound * mound * 1.2;
+                }
+
+                const dx = Math.abs(dxp);
+                const dz = Math.abs(dzp);
+                if (dx < plaza.half + plaza.edgeBlend && dz < plaza.half + plaza.edgeBlend) {
+                    const insideX = dx < plaza.half;
+                    const insideZ = dz < plaza.half;
+                    const plazaBase = plaza.slabY - plaza.slabThick / 2;
+                    const targetFloor = plazaBase - 0.1;
+
                     if (insideX && insideZ) {
-                        if (height > plazaY - 0.6) {
-                            height = plazaY - 0.6;
-                        }
+                        height = Math.min(height, targetFloor);
                     } else {
-                        const dx = Math.max(0, Math.abs(x) - plazaHalf);
-                        const dz = Math.max(0, Math.abs(z - plazaCenterZ) - plazaHalf);
-                        const edgeDist = Math.sqrt(dx * dx + dz * dz);
-                        const blend = Math.min(1, edgeDist / 4);
-                        const flatHeight = Math.min(height, plazaY - 0.6);
-                        height = flatHeight + (height - flatHeight) * blend;
+                        const dxEdge = Math.max(0, dx - plaza.half);
+                        const dzEdge = Math.max(0, dz - plaza.half);
+                        const edgeDist = Math.sqrt(dxEdge * dxEdge + dzEdge * dzEdge);
+                        const blend = Math.min(1, edgeDist / plaza.edgeBlend);
+                        const limited = Math.min(height, targetFloor);
+                        height = limited + (height - limited) * blend;
                     }
                 }
             }
@@ -1524,11 +1917,11 @@
         }
 
         const PLAYER_RADIUS = 0.35;
-        const TERRAIN_SLOPE_SAMPLE_STEP = 0.8;
-        const MAX_PLAYER_SLOPE = 0.15;
-        const MAX_AI_SLOPE = 0.08;
-        const PLAYER_MOVE_SWEEP_STEP = 0.16;
-        const MAX_TERRAIN_STEP_UP = 0.35;
+        const TERRAIN_SLOPE_SAMPLE_STEP = 1.5;
+        const MAX_PLAYER_SLOPE = 0.45;
+        const MAX_AI_SLOPE = 0.06;
+        const PLAYER_MOVE_SWEEP_STEP = 0.12;
+        const MAX_TERRAIN_STEP_UP = 0.6;
 
         function getTerrainSlope(x, z, sampleStep = TERRAIN_SLOPE_SAMPLE_STEP) {
             const hL = getTerrainHeight(x - sampleStep, z);
@@ -1546,9 +1939,10 @@
 
         // Check if position is on the stone plaza platform
         function getPlazaHeight(x, z) {
-            const plazaH = 18;
-            if (Math.abs(x) < plazaH && Math.abs(z - 20) < plazaH) {
-                return 1.5; // plaza top = 1.2 + 0.3
+            if (activeMapConfig.hasPlaza === false) return null;
+            const plaza = PLAZA_CONFIG;
+            if (Math.abs(x - plaza.centerX) < plaza.half && Math.abs(z - plaza.centerZ) < plaza.half) {
+                return plaza.slabY + plaza.slabThick / 2;
             }
             return null;
         }
@@ -1637,6 +2031,11 @@
         function createProceduralTerrainMaps(maxAnisotropy = 1) {
             const size = 256;
             const heights = new Float32Array(size * size);
+            const groundPalette = activeMapConfig.groundColors || defaultGroundColors;
+            const grassBase = new THREE.Color(groundPalette.base);
+            const grassLight = new THREE.Color(groundPalette.light);
+            const grassDark = new THREE.Color(groundPalette.dark);
+            const dirtBase = new THREE.Color(groundPalette.dirt);
 
             const colorCanvas = document.createElement('canvas');
             colorCanvas.width = size;
@@ -1660,9 +2059,13 @@
                     const grassMix = Math.max(0, Math.min(1, h * 0.7 + moisture * 0.3));
                     const dirtMix = 1 - grassMix;
 
-                    const r = Math.floor(54 * grassMix + 102 * dirtMix);
-                    const g = Math.floor(104 * grassMix + 78 * dirtMix);
-                    const b = Math.floor(52 * grassMix + 60 * dirtMix);
+                    const grassTone = grassBase.clone()
+                        .lerp(grassLight, grassMix * 0.35)
+                        .lerp(grassDark, (1 - grassMix) * 0.25);
+                    const finalColor = grassTone.lerp(dirtBase, dirtMix);
+                    const r = Math.floor(finalColor.r * 255);
+                    const g = Math.floor(finalColor.g * 255);
+                    const b = Math.floor(finalColor.b * 255);
 
                     const p = i * 4;
                     colorImage.data[p] = r;
@@ -1728,13 +2131,18 @@
         }
 
         function createAtmosphere() {
+            const mapSky = new THREE.Color(activeMapConfig.skyColor || 0x5da3e0);
+            const mapHorizon = new THREE.Color(activeMapConfig.fogColor || 0x9ec7ea);
+            const mapBottom = mapSky.clone().lerp(new THREE.Color(0x000000), 0.45);
+            const sunTint = activeMapConfig.light && activeMapConfig.light.sunTint ? activeMapConfig.light.sunTint : 0xffd08a;
+            const hazeValue = activeMapConfig.haze != null ? activeMapConfig.haze : 0.38;
             skyUniforms = {
-                topColor: { value: new THREE.Color(0x5da3e0) },
-                horizonColor: { value: new THREE.Color(0x9ec7ea) },
-                bottomColor: { value: new THREE.Color(0xb0b8c5) },
-                sunColor: { value: new THREE.Color(0xffd08a) },
+                topColor: { value: mapSky },
+                horizonColor: { value: mapHorizon },
+                bottomColor: { value: mapBottom },
+                sunColor: { value: new THREE.Color(sunTint) },
                 sunDirection: { value: new THREE.Vector3(0.2, 0.9, 0.1).normalize() },
-                haze: { value: 0.38 }
+                haze: { value: hazeValue }
             };
 
             const skyMat = new THREE.ShaderMaterial({
@@ -1783,9 +2191,11 @@
 
             cloudLayer = [];
             const cloudGeo = new THREE.PlaneGeometry(18, 11, 8, 4);
-            for (let i = 0; i < 30; i++) {
+            const cloudCount = activeMapConfig.cloudCount != null ? activeMapConfig.cloudCount : 30;
+            const cloudColor = activeMapConfig.cloudColor != null ? activeMapConfig.cloudColor : 0xffffff;
+            for (let i = 0; i < cloudCount; i++) {
                 const cloudMat = new THREE.MeshLambertMaterial({
-                    color: 0xffffff,
+                    color: cloudColor,
                     transparent: true,
                     opacity: 0.2 + Math.random() * 0.08,
                     depthWrite: false,
@@ -1799,7 +2209,7 @@
                 scene.add(cloud);
                 cloudLayer.push({
                     mesh: cloud,
-                    speed: 0.008 + Math.random() * 0.02,
+                    speed: 0.002 + Math.random() * 0.005,
                     driftAngle: Math.random() * Math.PI * 2,
                     phase: Math.random() * Math.PI * 2
                 });
@@ -1807,11 +2217,13 @@
 
             atmosphericMist = [];
             const mistGeo = new THREE.PlaneGeometry(24, 24);
-            for (let i = 0; i < 12; i++) {
+            const mistCount = activeMapConfig.mistCount != null ? activeMapConfig.mistCount : 12;
+            const mistColor = activeMapConfig.mistColor != null ? activeMapConfig.mistColor : 0xd5e4ef;
+            for (let i = 0; i < mistCount; i++) {
                 const x = (Math.random() - 0.5) * 180;
                 const z = (Math.random() - 0.5) * 180;
                 const mistMat = new THREE.MeshBasicMaterial({
-                    color: 0xd5e4ef,
+                    color: mistColor,
                     transparent: true,
                     opacity: 0.05 + Math.random() * 0.05,
                     depthWrite: false,
@@ -1875,7 +2287,7 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
+            renderer.toneMappingExposure = 1.5;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.physicallyCorrectLights = true;
             document.body.appendChild(renderer.domElement);
@@ -1885,10 +2297,10 @@
             setupPostProcessing();
 
             // Realistic lighting
-            ambientLight = new THREE.AmbientLight(0x8899aa, 0.4);
+            ambientLight = new THREE.AmbientLight(0x99aacc, 0.6);
             scene.add(ambientLight);
 
-            sunLight = new THREE.DirectionalLight(0xffeedd, 1.0);
+            sunLight = new THREE.DirectionalLight(0xffeedd, 1.4);
             sunLight.position.set(60, 100, 40);
             sunLight.castShadow = true;
             const shadowRes = deviceMode === 'mobile' ? 1024 : 2048;
@@ -1911,25 +2323,38 @@
             hemiLight = new THREE.HemisphereLight(0x88bbff, 0x445522, 0.5);
             scene.add(hemiLight);
 
+            // Player flashlight for nighttime illumination
+            playerFlashlight = new THREE.SpotLight(0xffeebb, 0, 25, Math.PI * 0.25, 0.4, 1.5);
+            playerFlashlight.castShadow = false;
+            const flashTarget = new THREE.Object3D();
+            scene.add(flashTarget);
+            playerFlashlight.target = flashTarget;
+            scene.add(playerFlashlight);
+
             const terrainMaps = createProceduralTerrainMaps(renderer.capabilities.getMaxAnisotropy());
             
             // Ground - realistic grass with hills (higher resolution)
             const groundGeo = new THREE.PlaneGeometry(250, 250, 120, 120);
             const positions = groundGeo.attributes.position;
             const colors = [];
+            let minTerrain = Infinity;
+            let maxTerrain = -Infinity;
+            const groundPalette = activeMapConfig.groundColors || defaultGroundColors;
 
             for (let i = 0; i < positions.count; i++) {
                 const x = positions.getX(i);
                 const z = -positions.getY(i);
                 const height = getTerrainHeight(x, z);
+                if (height < minTerrain) minTerrain = height;
+                if (height > maxTerrain) maxTerrain = height;
 
                 positions.setZ(i, height);
 
                 // Vertex colors for ground variation
-                const grassBase = new THREE.Color(0x4a7c3f);
-                const grassDark = new THREE.Color(0x3a5c2f);
-                const grassLight = new THREE.Color(0x5a9c4f);
-                const dirt = new THREE.Color(0x6b5344);
+                const grassBase = new THREE.Color(groundPalette.base);
+                const grassDark = new THREE.Color(groundPalette.dark);
+                const grassLight = new THREE.Color(groundPalette.light);
+                const dirt = new THREE.Color(groundPalette.dirt);
 
                 // Mix colors based on position and height
                 let color = grassBase.clone();
@@ -1967,112 +2392,254 @@
                 metalness: 0.02,
                 flatShading: false
             });
+            groundMat.color.setHex(activeMapConfig.groundTint || 0xffffff);
+            groundMat.emissive.setHex(activeMapConfig.groundEmissive || 0x000000);
+            groundMat.emissiveIntensity = activeMapConfig.groundEmissiveIntensity || 0;
             groundMat.normalScale = new THREE.Vector2(0.35, 0.35);
             ground = new THREE.Mesh(groundGeo, groundMat);
             ground.rotation.x = -Math.PI / 2;
             ground.receiveShadow = true;
             scene.add(ground);
+            plazaMeshes = [];
+            pathMeshes = [];
 
-            // Stone plaza slab (half-levitating, centered at 0, 20)
-            const plazaSlabY = 1.2;
-            const plazaSlabThick = 0.6;
-            const plazaSlabGeo = new THREE.BoxGeometry(36, plazaSlabThick, 36);
-            const plazaSlabMat = new THREE.MeshStandardMaterial({
-                color: 0x5a5a6a,
-                roughness: 0.82,
-                metalness: 0.12
+            // Solid terrain body + skirts to make hills feel solid
+            const terrainBaseDepth = 22;
+            const terrainBaseTop = minTerrain - 0.6;
+            const baseGeo = new THREE.BoxGeometry(250, terrainBaseDepth, 250);
+            const baseMat = new THREE.MeshStandardMaterial({
+                color: 0x3b2e24,
+                roughness: 0.95,
+                metalness: 0.02
             });
-            const plazaSlab = new THREE.Mesh(plazaSlabGeo, plazaSlabMat);
-            plazaSlab.position.set(0, plazaSlabY, 20);
-            plazaSlab.castShadow = true;
-            plazaSlab.receiveShadow = true;
-            scene.add(plazaSlab);
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.position.set(0, terrainBaseTop - terrainBaseDepth / 2, 0);
+            base.receiveShadow = true;
+            scene.add(base);
 
-            // Stone support pillars on the hill-side (north) half
-            const pillarPositions = [
-                [-12, 20 - 12], [12, 20 - 12], [-12, 20 - 4], [12, 20 - 4]
+            const skirtHeight = (maxTerrain - terrainBaseTop) + 6;
+            const skirtY = terrainBaseTop + skirtHeight / 2;
+            const skirtThickness = 6;
+            const halfSize = 125;
+            const skirts = [
+                { geo: new THREE.BoxGeometry(250 + skirtThickness * 2, skirtHeight, skirtThickness), pos: [0, skirtY, halfSize + skirtThickness / 2] },
+                { geo: new THREE.BoxGeometry(250 + skirtThickness * 2, skirtHeight, skirtThickness), pos: [0, skirtY, -halfSize - skirtThickness / 2] },
+                { geo: new THREE.BoxGeometry(skirtThickness, skirtHeight, 250), pos: [halfSize + skirtThickness / 2, skirtY, 0] },
+                { geo: new THREE.BoxGeometry(skirtThickness, skirtHeight, 250), pos: [-halfSize - skirtThickness / 2, skirtY, 0] }
             ];
-            for (const [px, pz] of pillarPositions) {
-                const terrY = getTerrainHeight(px, pz);
-                const pillarH = plazaSlabY - plazaSlabThick / 2 - terrY;
-                if (pillarH > 0.2) {
-                    const pillarGeo = new THREE.CylinderGeometry(0.6, 0.8, pillarH, 8);
-                    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x4a4a5a, roughness: 0.9 });
-                    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-                    pillar.position.set(px, terrY + pillarH / 2, pz);
-                    pillar.castShadow = true;
-                    scene.add(pillar);
+            for (const s of skirts) {
+                const skirt = new THREE.Mesh(s.geo, baseMat);
+                skirt.position.set(...s.pos);
+                skirt.receiveShadow = true;
+                scene.add(skirt);
+            }
+
+            if (activeMapConfig.hasPlaza !== false) {
+                // Stone plaza slab (half-levitating, centered at plaza config)
+                const plazaCenterX = PLAZA_CONFIG.centerX;
+                const plazaCenterZ = PLAZA_CONFIG.centerZ;
+                const plazaHalf = PLAZA_CONFIG.half;
+                const plazaSlabY = PLAZA_CONFIG.slabY;
+                const plazaSlabThick = PLAZA_CONFIG.slabThick;
+                const plazaSlabGeo = new THREE.BoxGeometry(plazaHalf * 2, plazaSlabThick, plazaHalf * 2);
+                const plazaSlabMat = new THREE.MeshStandardMaterial({
+                    color: 0x5a5a6a,
+                    roughness: 0.82,
+                    metalness: 0.12
+                });
+                const plazaSlab = new THREE.Mesh(plazaSlabGeo, plazaSlabMat);
+                plazaSlab.position.set(plazaCenterX, plazaSlabY, plazaCenterZ);
+                plazaSlab.castShadow = true;
+                plazaSlab.receiveShadow = true;
+                scene.add(plazaSlab);
+                plazaMeshes.push(plazaSlab);
+
+                // Stone support pillars on ALL sides of the plaza
+                const pillarOffset = plazaHalf * 0.65;
+                const pillarInner = plazaHalf * 0.25;
+                const pillarPositions = [
+                    // All four corners
+                    [plazaCenterX - pillarOffset, plazaCenterZ - pillarOffset],
+                    [plazaCenterX + pillarOffset, plazaCenterZ - pillarOffset],
+                    [plazaCenterX - pillarOffset, plazaCenterZ + pillarOffset],
+                    [plazaCenterX + pillarOffset, plazaCenterZ + pillarOffset],
+                    // Mid-edges
+                    [plazaCenterX - pillarOffset, plazaCenterZ],
+                    [plazaCenterX + pillarOffset, plazaCenterZ],
+                    [plazaCenterX, plazaCenterZ - pillarOffset],
+                    [plazaCenterX, plazaCenterZ + pillarOffset],
+                    // Inner ring
+                    [plazaCenterX - pillarInner, plazaCenterZ - pillarInner],
+                    [plazaCenterX + pillarInner, plazaCenterZ + pillarInner]
+                ];
+                for (const [px, pz] of pillarPositions) {
+                    const terrY = getTerrainHeight(px, pz);
+                    const pillarH = plazaSlabY - plazaSlabThick / 2 - terrY;
+                    if (pillarH > 0.15) {
+                        const pillarGeo = new THREE.CylinderGeometry(0.6, 0.8, pillarH, 8);
+                        const pillarMat = new THREE.MeshStandardMaterial({ color: 0x4a4a5a, roughness: 0.9 });
+                        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                        pillar.position.set(px, terrY + pillarH / 2, pz);
+                        pillar.castShadow = true;
+                        scene.add(pillar);
+                        plazaMeshes.push(pillar);
+                    }
+                }
+
+                // Fill walls under plaza perimeter (close gaps between pillars)
+                const fillMat = new THREE.MeshStandardMaterial({ color: 0x4a4a5a, roughness: 0.92 });
+                const fillSegments = 20;
+                const slabBottom = plazaSlabY - plazaSlabThick / 2;
+                const edgeDefs = [
+                    { startX: plazaCenterX - plazaHalf, endX: plazaCenterX + plazaHalf, fixedZ: plazaCenterZ - plazaHalf, alongX: true },
+                    { startX: plazaCenterX - plazaHalf, endX: plazaCenterX + plazaHalf, fixedZ: plazaCenterZ + plazaHalf, alongX: true },
+                    { startZ: plazaCenterZ - plazaHalf, endZ: plazaCenterZ + plazaHalf, fixedX: plazaCenterX - plazaHalf, alongX: false },
+                    { startZ: plazaCenterZ - plazaHalf, endZ: plazaCenterZ + plazaHalf, fixedX: plazaCenterX + plazaHalf, alongX: false }
+                ];
+                for (const edge of edgeDefs) {
+                    for (let s = 0; s < fillSegments; s++) {
+                        const t = s / fillSegments;
+                        const tNext = (s + 1) / fillSegments;
+                        let fx, fz, fxNext, fzNext;
+                        if (edge.alongX) {
+                            fx = edge.startX + t * (edge.endX - edge.startX);
+                            fxNext = edge.startX + tNext * (edge.endX - edge.startX);
+                            fz = edge.fixedZ;
+                            fzNext = edge.fixedZ;
+                        } else {
+                            fz = edge.startZ + t * (edge.endZ - edge.startZ);
+                            fzNext = edge.startZ + tNext * (edge.endZ - edge.startZ);
+                            fx = edge.fixedX;
+                            fxNext = edge.fixedX;
+                        }
+                        const midX = (fx + fxNext) / 2;
+                        const midZ = (fz + fzNext) / 2;
+                        const terrY = getTerrainHeight(midX, midZ);
+                        const fillH = slabBottom - terrY;
+                        if (fillH > 0.1) {
+                            const segW = edge.alongX
+                                ? (edge.endX - edge.startX) / fillSegments + 0.05
+                                : (edge.endZ - edge.startZ) / fillSegments + 0.05;
+                            const fillGeo = new THREE.BoxGeometry(
+                                edge.alongX ? segW : 0.3,
+                                fillH,
+                                edge.alongX ? 0.3 : segW
+                            );
+                            const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+                            fillMesh.position.set(midX, terrY + fillH / 2, midZ);
+                            fillMesh.receiveShadow = true;
+                            scene.add(fillMesh);
+                            plazaMeshes.push(fillMesh);
+                        }
+                    }
+                }
+
+                // Stone edge borders around perimeter
+                const borderMat = new THREE.MeshStandardMaterial({ color: 0x484858, roughness: 0.85 });
+                const borderH = 0.3;
+                const borderW = 0.4;
+                const borderSpan = plazaHalf * 2;
+                const borders = [
+                    { geo: new THREE.BoxGeometry(borderSpan + borderW, borderH, borderW), pos: [plazaCenterX, plazaSlabY + plazaSlabThick / 2 + borderH / 2, plazaCenterZ - plazaHalf] },
+                    { geo: new THREE.BoxGeometry(borderSpan + borderW, borderH, borderW), pos: [plazaCenterX, plazaSlabY + plazaSlabThick / 2 + borderH / 2, plazaCenterZ + plazaHalf] },
+                    { geo: new THREE.BoxGeometry(borderW, borderH, borderSpan), pos: [plazaCenterX - plazaHalf, plazaSlabY + plazaSlabThick / 2 + borderH / 2, plazaCenterZ] },
+                    { geo: new THREE.BoxGeometry(borderW, borderH, borderSpan), pos: [plazaCenterX + plazaHalf, plazaSlabY + plazaSlabThick / 2 + borderH / 2, plazaCenterZ] }
+                ];
+                for (const b of borders) {
+                    const borderMesh = new THREE.Mesh(b.geo, borderMat);
+                    borderMesh.position.set(...b.pos);
+                    borderMesh.castShadow = true;
+                    scene.add(borderMesh);
+                    plazaMeshes.push(borderMesh);
+                }
+
+                // Subtle blue/purple underglow (skip in low-lag mode)
+                if (!shouldUseLowLagProfile()) {
+                    const underGlow = new THREE.PointLight(0x6644aa, 1.5, 30);
+                    underGlow.position.set(plazaCenterX, plazaSlabY - 1.5, plazaCenterZ - plazaHalf * 0.45);
+                    scene.add(underGlow);
+                    plazaMeshes.push(underGlow);
+                }
+
+                // Cobblestone detail stones on plaza surface
+                for (let s = 0; s < 80; s++) {
+                    const stoneSpan = plazaHalf * 2 - 4;
+                    const stoneX = plazaCenterX + (Math.random() - 0.5) * stoneSpan;
+                    const stoneZ = plazaCenterZ + (Math.random() - 0.5) * stoneSpan;
+                    const stoneSize = 0.3 + Math.random() * 0.4;
+                    const stoneGeo = new THREE.CylinderGeometry(stoneSize, stoneSize * 0.9, 0.08, 6);
+                    const stoneMat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(0, 0, 0.35 + Math.random() * 0.2),
+                        roughness: 0.9
+                    });
+                    const stone = new THREE.Mesh(stoneGeo, stoneMat);
+                    stone.position.set(stoneX, plazaSlabY + plazaSlabThick / 2 + 0.04, stoneZ);
+                    stone.rotation.y = Math.random() * Math.PI;
+                    stone.receiveShadow = true;
+                    scene.add(stone);
+                    plazaMeshes.push(stone);
                 }
             }
 
-            // Stone edge borders around perimeter
-            const borderMat = new THREE.MeshStandardMaterial({ color: 0x484858, roughness: 0.85 });
-            const borderH = 0.3;
-            const borderW = 0.4;
-            const borders = [
-                { geo: new THREE.BoxGeometry(36 + borderW, borderH, borderW), pos: [0, plazaSlabY + plazaSlabThick / 2 + borderH / 2, 20 - 18] },
-                { geo: new THREE.BoxGeometry(36 + borderW, borderH, borderW), pos: [0, plazaSlabY + plazaSlabThick / 2 + borderH / 2, 20 + 18] },
-                { geo: new THREE.BoxGeometry(borderW, borderH, 36), pos: [-18, plazaSlabY + plazaSlabThick / 2 + borderH / 2, 20] },
-                { geo: new THREE.BoxGeometry(borderW, borderH, 36), pos: [18, plazaSlabY + plazaSlabThick / 2 + borderH / 2, 20] }
-            ];
-            for (const b of borders) {
-                const borderMesh = new THREE.Mesh(b.geo, borderMat);
-                borderMesh.position.set(...b.pos);
-                borderMesh.castShadow = true;
-                scene.add(borderMesh);
+            // Dirt paths that follow terrain height and slope
+            if (activeMapConfig.hasPaths !== false) {
+                const pathMat = new THREE.MeshStandardMaterial({ color: 0x7a6355, roughness: 0.95, side: THREE.DoubleSide });
+                const pathCenterX = PLAZA_CONFIG.centerX;
+                const pathCenterZ = PLAZA_CONFIG.centerZ;
+
+                // Helper: create a terrain-following path strip
+                function createTerrainPath(startX, startZ, endX, endZ, width, segments) {
+                    const dx = endX - startX;
+                    const dz = endZ - startZ;
+                    const length = Math.sqrt(dx * dx + dz * dz);
+                    const dirX = dx / length;
+                    const dirZ = dz / length;
+                    const perpX = -dirZ;
+                    const perpZ = dirX;
+                    const halfW = width / 2;
+                    const rows = segments + 1;
+                    const verts = [];
+                    const indices = [];
+                    const uvArr = [];
+
+                    for (let r = 0; r < rows; r++) {
+                        const t = r / segments;
+                        for (let c = 0; c < 2; c++) {
+                            const side = c === 0 ? -halfW : halfW;
+                            const wx = startX + dirX * t * length + perpX * side;
+                            const wz = startZ + dirZ * t * length + perpZ * side;
+                            const h = getTerrainHeight(wx, wz) + 0.06;
+                            verts.push(wx, h, wz);
+                            uvArr.push(c, t);
+                        }
+                    }
+                    for (let r = 0; r < segments; r++) {
+                        const i = r * 2;
+                        indices.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
+                    }
+
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+                    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+                    geo.setIndex(indices);
+                    geo.computeVertexNormals();
+
+                    const mesh = new THREE.Mesh(geo, pathMat);
+                    mesh.receiveShadow = true;
+                    scene.add(mesh);
+                    pathMeshes.push(mesh);
+                    return mesh;
+                }
+
+                // Main path (north-south through plaza)
+                createTerrainPath(pathCenterX, pathCenterZ - 75, pathCenterX, pathCenterZ + 75, 4, 60);
+
+                // East-west path
+                createTerrainPath(pathCenterX - 50, pathCenterZ + 12, pathCenterX + 50, pathCenterZ + 12, 3.5, 40);
+
+                // Diagonal path (to church area)
+                createTerrainPath(pathCenterX + 5, pathCenterZ, pathCenterX + 35, pathCenterZ - 20, 3, 30);
             }
-
-            // Subtle blue/purple underglow (skip in low-lag mode)
-            if (!shouldUseLowLagProfile()) {
-                const underGlow = new THREE.PointLight(0x6644aa, 1.5, 30);
-                underGlow.position.set(0, plazaSlabY - 1.5, 20 + 8);
-                scene.add(underGlow);
-            }
-
-            // Cobblestone detail stones on plaza surface
-            for (let s = 0; s < 80; s++) {
-                const stoneX = (Math.random() - 0.5) * 32;
-                const stoneZ = 20 + (Math.random() - 0.5) * 32;
-                const stoneSize = 0.3 + Math.random() * 0.4;
-                const stoneGeo = new THREE.CylinderGeometry(stoneSize, stoneSize * 0.9, 0.08, 6);
-                const stoneMat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color().setHSL(0, 0, 0.35 + Math.random() * 0.2),
-                    roughness: 0.9
-                });
-                const stone = new THREE.Mesh(stoneGeo, stoneMat);
-                stone.position.set(stoneX, plazaSlabY + plazaSlabThick / 2 + 0.04, stoneZ);
-                stone.rotation.y = Math.random() * Math.PI;
-                stone.receiveShadow = true;
-                scene.add(stone);
-            }
-
-            // Dirt paths (multiple)
-            const pathMat = new THREE.MeshStandardMaterial({ color: 0x7a6355, roughness: 0.95 });
-
-            // Main path (north-south)
-            const pathGeo1 = new THREE.PlaneGeometry(4, 150);
-            const path1 = new THREE.Mesh(pathGeo1, pathMat);
-            path1.rotation.x = -Math.PI / 2;
-            path1.position.y = 0.02;
-            path1.receiveShadow = true;
-            scene.add(path1);
-
-            // East-west path
-            const pathGeo2 = new THREE.PlaneGeometry(100, 3.5);
-            const path2 = new THREE.Mesh(pathGeo2, pathMat);
-            path2.rotation.x = -Math.PI / 2;
-            path2.position.set(0, 0.02, 12);
-            path2.receiveShadow = true;
-            scene.add(path2);
-
-            // Path to church
-            const pathGeo3 = new THREE.PlaneGeometry(3, 40);
-            const path3 = new THREE.Mesh(pathGeo3, pathMat);
-            path3.rotation.x = -Math.PI / 2;
-            path3.rotation.z = -0.4;
-            path3.position.set(20, 0.02, -5);
-            path3.receiveShadow = true;
-            scene.add(path3);
 
             // Scatter small rocks on ground
             for (let r = 0; r < 50; r++) {
@@ -2094,8 +2661,9 @@
             }
             
             createEnvironment();
-            createBuildings();
+            if (activeMapConfig.hasBuildings !== false) createBuildings();
             createAtmosphere();
+            applyMapConfig(selectedMapId);
             
             const playerGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.7, 16);
             const playerMat = new THREE.MeshStandardMaterial({ visible: false });
@@ -2174,15 +2742,54 @@
                 const sky = new THREE.Color(cfg.skyColor || 0x87ceeb);
                 skyUniforms.topColor.value.copy(sky);
                 skyUniforms.horizonColor.value.copy(new THREE.Color(cfg.fogColor || 0xb0c4de));
+                if (cfg.haze !== undefined) {
+                    skyUniforms.haze.value = cfg.haze;
+                }
             }
+            if (ambientLight && cfg.light && cfg.light.ambientTint) {
+                ambientLight.color.setHex(cfg.light.ambientTint);
+            }
+            if (sunLight && cfg.light && cfg.light.sunTint) {
+                sunLight.color.setHex(cfg.light.sunTint);
+            }
+            if (hemiLight && cfg.light) {
+                if (cfg.light.hemiSkyTint) hemiLight.color.setHex(cfg.light.hemiSkyTint);
+                if (cfg.light.hemiGroundTint) hemiLight.groundColor.setHex(cfg.light.hemiGroundTint);
+            }
+            if (ground && ground.material) {
+                ground.material.color.setHex(cfg.groundTint || 0xffffff);
+                if (ground.material.emissive) {
+                    ground.material.emissive.setHex(cfg.groundEmissive || 0x000000);
+                    ground.material.emissiveIntensity = cfg.groundEmissiveIntensity || 0;
+                }
+                ground.material.needsUpdate = true;
+            }
+            const showPlaza = cfg.hasPlaza !== false;
+            plazaMeshes.forEach(m => { if (m) m.visible = showPlaza; });
+            const showPaths = cfg.hasPaths !== false;
+            pathMeshes.forEach(m => { if (m) m.visible = showPaths; });
+            const showBuildings = cfg.hasBuildings !== false;
+            buildingMeshes.forEach(m => { if (m) m.visible = showBuildings; });
         }
 
         function createEnvironment() {
             colliders = [];
             windReactiveFoliage = [];
+            const foliageCfg = activeMapConfig.foliage || defaultFoliage;
+            const treeCount = Math.max(0, Math.round(activeMapConfig.treeDensity || 0));
+            const rockCount = Math.max(0, Math.round(activeMapConfig.rockDensity || 0));
+            const grassCount = Math.max(0, Math.round(activeMapConfig.grassDensity || 0));
+            const foliageHue = foliageCfg.foliageHue ?? 0.28;
+            const foliageSat = foliageCfg.foliageSat ?? 0.45;
+            const foliageLight = foliageCfg.foliageLight ?? 0.28;
+            const grassHue = foliageCfg.grassHue ?? 0.25;
+            const grassSat = foliageCfg.grassSat ?? 0.5;
+            const grassLight = foliageCfg.grassLight ?? 0.32;
+            const trunkColor = foliageCfg.trunkColor || 0x5d4037;
+            const rockBaseColor = foliageCfg.rockColor || 0x666666;
             
             // Trees - realistic
-            for (let i = 0; i < 40; i++) {
+            for (let i = 0; i < treeCount; i++) {
                 const x = (Math.random() - 0.5) * 200;
                 const z = (Math.random() - 0.5) * 200;
                 
@@ -2195,7 +2802,7 @@
                 
                 // Trunk
                 const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, treeHeight * 0.4, 8);
-                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.9 });
+                const trunkMat = new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.9 });
                 const trunk = new THREE.Mesh(trunkGeo, trunkMat);
                 trunk.position.set(x, terrainY + treeHeight * 0.2, z);
                 trunk.castShadow = true;
@@ -2214,7 +2821,11 @@
                     const foliageRadius = (1.5 - j * 0.3) * (0.8 + Math.random() * 0.2);
                     const foliageGeo = new THREE.ConeGeometry(foliageRadius, treeHeight * 0.2, 8);
                     const foliageMat = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color().setHSL(0.28 + Math.random() * 0.05, 0.45, 0.28 + Math.random() * 0.06),
+                        color: new THREE.Color().setHSL(
+                            foliageHue + (Math.random() - 0.5) * 0.06,
+                            foliageSat,
+                            foliageLight + (Math.random() - 0.5) * 0.08
+                        ),
                         roughness: 0.85
                     });
                     const foliage = new THREE.Mesh(foliageGeo, foliageMat);
@@ -2233,7 +2844,7 @@
             }
             
             // Rocks - realistic flat orientation
-            for (let i = 0; i < 25; i++) {
+            for (let i = 0; i < rockCount; i++) {
                 const x = (Math.random() - 0.5) * 180;
                 const z = (Math.random() - 0.5) * 180;
                 
@@ -2242,8 +2853,9 @@
                 const terrainY = getTerrainHeight(x, z);
                 const rockSize = 0.3 + Math.random() * 0.8;
                 const rockGeo = new THREE.DodecahedronGeometry(rockSize, 0);
+                const rockBase = new THREE.Color(rockBaseColor);
                 const rockMat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color(0.4 + Math.random() * 0.15, 0.4 + Math.random() * 0.1, 0.38),
+                    color: rockBase.clone().lerp(new THREE.Color(0xffffff), Math.random() * 0.08),
                     roughness: 0.95,
                     flatShading: true
                 });
@@ -2270,14 +2882,18 @@
             }
             
             // Grass tufts
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < grassCount; i++) {
                 const x = (Math.random() - 0.5) * 120;
                 const z = (Math.random() - 0.5) * 120;
                 const terrainY = getTerrainHeight(x, z);
                 
                 const grassGeo = new THREE.PlaneGeometry(0.12, 0.3 + Math.random() * 0.2);
                 const grassMat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color().setHSL(0.25 + Math.random() * 0.05, 0.5, 0.32),
+                    color: new THREE.Color().setHSL(
+                        grassHue + (Math.random() - 0.5) * 0.08,
+                        grassSat,
+                        grassLight + (Math.random() - 0.5) * 0.08
+                    ),
                     side: THREE.DoubleSide
                 });
                 const grass = new THREE.Mesh(grassGeo, grassMat);
@@ -2298,6 +2914,8 @@
         
         function createBuildings() {
             buildings = [];
+            buildingMeshes = [];
+            if (activeMapConfig.hasBuildings === false) return;
 
             const buildingData = [
                 // Village center
@@ -2397,6 +3015,7 @@
 
             wellGroup.position.set(x, terrainY, z);
             scene.add(wellGroup);
+            buildingMeshes.push(wellGroup);
         }
 
         function createMarketStall(x, z) {
@@ -2450,6 +3069,7 @@
 
             stallGroup.position.set(x, terrainY, z);
             scene.add(stallGroup);
+            buildingMeshes.push(stallGroup);
         }
 
         function createFence(x, z, length, rotation) {
@@ -2480,6 +3100,7 @@
             fenceGroup.rotation.y = rotation;
             fenceGroup.position.set(x, terrainY, z);
             scene.add(fenceGroup);
+            buildingMeshes.push(fenceGroup);
         }
         
         function createBuilding(x, z, type, terrainY) {
@@ -2894,6 +3515,7 @@
 
             building.position.set(x, baseY, z);
             scene.add(building);
+            buildingMeshes.push(building);
             
             // Collision - walls only (not door opening)
             const collisionY = baseY + buildingBaseY;
@@ -5547,7 +6169,9 @@
         }
         
         function damagePlayer(damage) {
-            const finalDamage = Math.max(1, damage - playerState.defense);
+            // Monsters deal 10% more damage at night
+            const nightBonus = isNightTime ? 1.1 : 1.0;
+            const finalDamage = Math.max(1, (damage * nightBonus) - playerState.defense);
             playerState.health -= finalDamage;
             
             const v = document.createElement('div');
@@ -5966,7 +6590,13 @@
             const lowLag = shouldUseLowLagProfile();
             if (lowLag) {
                 realismUpdateAccumulator += dt;
-                const lagInterval = connectionQuality === 'poor' ? 140 : connectionQuality === 'fair' ? 90 : LOW_LAG_ENVIRONMENT_INTERVAL;
+                const lagInterval = multiplayerLagMode
+                    ? 150
+                    : connectionQuality === 'poor'
+                        ? 140
+                        : connectionQuality === 'fair'
+                            ? 90
+                            : LOW_LAG_ENVIRONMENT_INTERVAL;
                 if (realismUpdateAccumulator < lagInterval) return;
                 dt = realismUpdateAccumulator;
                 realismUpdateAccumulator = 0;
@@ -5975,17 +6605,28 @@
             }
 
             windTime += dt * 0.0007;
-            worldTime = (worldTime + dt * 0.00001) % 1;
+            worldTime = (worldTime + dt * WORLD_TIME_RATE) % 1;
             const sunAngle = worldTime * Math.PI * 2 - Math.PI * 0.5;
             const sunRaw = Math.sin(sunAngle);
             const dayBlend = Math.max(0, sunRaw);
             const twilightBlend = Math.max(0, 1 - Math.abs(sunRaw) * 1.6);
+            isNightTime = dayBlend < 0.05;
 
-            ambientLight.intensity = 0.08 + dayBlend * 0.33 + twilightBlend * 0.05;
-            hemiLight.intensity = 0.16 + dayBlend * 0.42;
-            sunLight.intensity = 0.08 + dayBlend * 1.2 + twilightBlend * 0.12;
+            const lightCfg = activeMapConfig.light || {};
+            const ambientMult = lightCfg.ambientMult != null ? lightCfg.ambientMult : 1;
+            const hemiMult = lightCfg.hemiMult != null ? lightCfg.hemiMult : 1;
+            const sunMult = lightCfg.sunMult != null ? lightCfg.sunMult : 1;
+
+            // Brighter base lighting - increased minimums for visibility
+            ambientLight.intensity = (0.30 + dayBlend * 0.55 + twilightBlend * 0.08) * ambientMult;
+            hemiLight.intensity = (0.40 + dayBlend * 0.55) * hemiMult;
+            sunLight.intensity = (0.25 + dayBlend * 1.5 + twilightBlend * 0.15) * sunMult;
             sunLight.position.set(Math.cos(sunAngle) * 58, 18 + dayBlend * 105, Math.sin(sunAngle) * 43);
             sunLight.color.setHSL(0.07 + dayBlend * 0.06, 0.58, 0.48 + dayBlend * 0.18);
+            if (lightCfg.sunTint) {
+                const tintStrength = lightCfg.sunTintStrength != null ? lightCfg.sunTintStrength : 0.35;
+                sunLight.color.lerp(new THREE.Color(lightCfg.sunTint), tintStrength);
+            }
 
             if (sunTarget && playerState) {
                 const px = playerState.position.x;
@@ -5993,14 +6634,24 @@
                 sunTarget.position.set(px, getTerrainHeight(px, pz) + 1, pz);
             }
 
-            skyColorTemp.setHSL(0.59 - dayBlend * 0.11, 0.42, 0.15 + dayBlend * 0.5);
-            fogColorTemp.setHSL(0.58 - dayBlend * 0.09, 0.35, 0.12 + dayBlend * 0.4);
+            skyColorTemp.setHSL(0.59 - dayBlend * 0.11, 0.42, 0.22 + dayBlend * 0.50);
+            fogColorTemp.setHSL(0.58 - dayBlend * 0.09, 0.35, 0.18 + dayBlend * 0.42);
+            if (activeMapConfig.skyColor) {
+                const skyBlend = activeMapConfig.skyBlend != null ? activeMapConfig.skyBlend : 0.25;
+                skyColorTemp.lerp(new THREE.Color(activeMapConfig.skyColor), skyBlend);
+            }
+            if (activeMapConfig.fogColor) {
+                const fogBlend = activeMapConfig.fogBlend != null ? activeMapConfig.fogBlend : 0.35;
+                fogColorTemp.lerp(new THREE.Color(activeMapConfig.fogColor), fogBlend);
+            }
             scene.background.lerp(skyColorTemp, 0.03);
             scene.fog.color.lerp(fogColorTemp, 0.03);
-            scene.fog.density += ((0.0048 + (1 - dayBlend) * 0.0016) - scene.fog.density) * 0.06;
+            const fogMult = activeMapConfig.fogDensityMult != null ? activeMapConfig.fogDensityMult : 1;
+            const fogTarget = (0.0048 + (1 - dayBlend) * 0.0016) * fogMult;
+            scene.fog.density += (fogTarget - scene.fog.density) * 0.06;
 
             if (renderer) {
-                const targetExposure = 0.95 + dayBlend * 0.45 + twilightBlend * 0.08;
+                const targetExposure = 1.30 + dayBlend * 0.60 + twilightBlend * 0.10;
                 renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * 0.04;
             }
 
@@ -6013,22 +6664,32 @@
             if (colorCorrectionUniforms) {
                 colorCorrectionUniforms.saturation.value = 1.05 + dayBlend * 0.1;
                 colorCorrectionUniforms.contrast.value = 1.03 + dayBlend * 0.06;
-                colorCorrectionUniforms.brightness.value = -0.02 + dayBlend * 0.05;
+                colorCorrectionUniforms.brightness.value = 0.02 + dayBlend * 0.06;
                 colorCorrectionUniforms.vignetteIntensity.value = 0.12 + (1 - dayBlend) * 0.09;
                 colorCorrectionUniforms.grainIntensity.value = 0.013 + (1 - dayBlend) * 0.013;
                 colorCorrectionUniforms.temperature.value = -0.01 + twilightBlend * 0.12;
             }
 
             if (skyUniforms) {
-                topSkyTemp.setHSL(0.59 - dayBlend * 0.12, 0.6, 0.22 + dayBlend * 0.35);
-                horizonSkyTemp.setHSL(0.58 - dayBlend * 0.09, 0.5, 0.3 + dayBlend * 0.42);
-                bottomSkyTemp.setHSL(0.57 - dayBlend * 0.05, 0.25, 0.18 + dayBlend * 0.22);
+                topSkyTemp.setHSL(0.59 - dayBlend * 0.12, 0.6, 0.28 + dayBlend * 0.38);
+                horizonSkyTemp.setHSL(0.58 - dayBlend * 0.09, 0.5, 0.34 + dayBlend * 0.42);
+                bottomSkyTemp.setHSL(0.57 - dayBlend * 0.05, 0.25, 0.24 + dayBlend * 0.24);
+                if (activeMapConfig.skyColor) {
+                    const skyBlend = activeMapConfig.skyBlend != null ? activeMapConfig.skyBlend : 0.25;
+                    const mapSky = new THREE.Color(activeMapConfig.skyColor);
+                    topSkyTemp.lerp(mapSky, skyBlend);
+                    bottomSkyTemp.lerp(mapSky, skyBlend * 0.6);
+                }
+                if (activeMapConfig.fogColor) {
+                    const fogBlend = activeMapConfig.fogBlend != null ? activeMapConfig.fogBlend : 0.35;
+                    horizonSkyTemp.lerp(new THREE.Color(activeMapConfig.fogColor), fogBlend);
+                }
                 skyUniforms.topColor.value.copy(topSkyTemp);
                 skyUniforms.horizonColor.value.copy(horizonSkyTemp);
                 skyUniforms.bottomColor.value.copy(bottomSkyTemp);
                 skyUniforms.sunColor.value.setHSL(0.08 + twilightBlend * 0.04, 0.8, 0.5 + dayBlend * 0.35);
                 skyUniforms.sunDirection.value.set(Math.cos(sunAngle), 0.2 + dayBlend * 0.85, Math.sin(sunAngle)).normalize();
-                skyUniforms.haze.value = 0.25 + (1 - dayBlend) * 0.23;
+                skyUniforms.haze.value = activeMapConfig.haze != null ? activeMapConfig.haze : 0.25 + (1 - dayBlend) * 0.23;
             }
 
             const foliageStep = lowLag ? 2 : 1;
@@ -6044,8 +6705,9 @@
             for (let i = 0; i < cloudLayer.length; i += cloudStep) {
                 const cloud = cloudLayer[i];
                 if (!cloud.mesh) continue;
-                cloud.mesh.position.x += Math.cos(cloud.driftAngle) * cloud.speed * dt;
-                cloud.mesh.position.z += Math.sin(cloud.driftAngle) * cloud.speed * dt;
+                // Slower cloud movement (0.15x of original speed)
+                cloud.mesh.position.x += Math.cos(cloud.driftAngle) * cloud.speed * 0.15 * dt;
+                cloud.mesh.position.z += Math.sin(cloud.driftAngle) * cloud.speed * 0.15 * dt;
                 if (cloud.mesh.position.x > 180) cloud.mesh.position.x = -180;
                 else if (cloud.mesh.position.x < -180) cloud.mesh.position.x = 180;
                 if (cloud.mesh.position.z > 180) cloud.mesh.position.z = -180;
@@ -6072,6 +6734,16 @@
                 const stretch = 1 + Math.min(0.35, speed2D * 3.5);
                 playerContactShadow.scale.set(stretch, 1 / stretch, 1);
             }
+
+            // Flashlight - active during night
+            if (playerFlashlight && playerState && camera) {
+                const targetIntensity = isNightTime ? 2.5 : 0;
+                playerFlashlight.intensity += (targetIntensity - playerFlashlight.intensity) * 0.08;
+                playerFlashlight.position.copy(camera.position);
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                playerFlashlight.target.position.copy(camera.position).add(dir.multiplyScalar(10));
+            }
         }
         
         let lastTime = 0;
@@ -6094,6 +6766,7 @@
 
             // In multiplayer, update remote players and sync position
             if (isMultiplayer) {
+                updateMultiplayerLagHandler(dt);
                 updateRemotePlayers(dt);
                 syncPositionToServer();
             } else {
@@ -6346,19 +7019,37 @@
                 case 'game_state':
                     myPlayerId = data.playerId;
                     matchTimeRemaining = data.timeRemaining;
-                    // Apply server map config
-                    if (data.map) {
-                        applyMapConfig(data.map);
+                    // Show map vote screen before starting
+                    openMultiplayerMapVote();
+                    // Store game state for after voting
+                    pendingGameState = data;
+                    break;
+
+                case 'voteResult':
+                    // Server resolved the vote - apply winning map
+                    if (data.mapId) {
+                        selectedMapId = data.mapId;
+                        activeMapConfig = getSelectedMapConfig();
+                        applyMapConfig(data.mapId);
                     }
-                    // Start the multiplayer game
-                    startMultiplayerGame();
-                    // Add existing players
-                    data.players.forEach(p => {
-                        if (p.id !== myPlayerId) {
-                            createRemotePlayer(p);
-                        }
-                    });
-                    updatePlayerCount();
+                    document.getElementById('multiplayerMapVote').style.display = 'none';
+                    if (pendingGameState) {
+                        const gs = pendingGameState;
+                        pendingGameState = null;
+                        startMultiplayerGame();
+                        gs.players.forEach(p => {
+                            if (p.id !== myPlayerId) {
+                                createRemotePlayer(p);
+                            }
+                        });
+                        updatePlayerCount();
+                    }
+                    break;
+
+                case 'mapVote':
+                    if (data.playerId !== myPlayerId) {
+                        handleRemoteMapVote(data.playerId, data.mapId, data.previousVote);
+                    }
                     break;
 
                 case 'player_joined':
@@ -6468,6 +7159,10 @@
 
         function startMultiplayerGame() {
             isMultiplayer = true;
+            multiplayerLagMode = false;
+            multiplayerLagStreak = 0;
+            lastNetworkMessageAt = performance.now();
+            lastLagToggleAt = 0;
             applyPerformanceProfile();
             renderer.domElement.style.display = 'block';
             document.getElementById('multiplayerLobby').style.display = 'none';
@@ -6741,6 +7436,11 @@
         }
 
         function getAdaptiveSyncInterval() {
+            if (multiplayerLagMode) {
+                if (connectionQuality === 'poor') return 220;
+                if (connectionQuality === 'fair') return 160;
+                return 120;
+            }
             if (connectionQuality === 'poor') return 180;
             if (connectionQuality === 'fair') return 120;
             if (frameBudgetOverruns > 10) return 100;
@@ -6768,6 +7468,30 @@
             }
             frameBudgetOverruns = 0;
             updateConnectionIndicator();
+        }
+
+        function updateMultiplayerLagHandler(dt) {
+            if (!isMultiplayer) return;
+            const now = performance.now();
+            const timeSinceNet = now - lastNetworkMessageAt;
+            const lagFrame = dt > MULTI_LAG_FRAME_MS;
+
+            if (lagFrame || timeSinceNet > MULTI_NET_STALL_MS) {
+                multiplayerLagStreak = Math.min(20, multiplayerLagStreak + 1);
+            } else {
+                multiplayerLagStreak = Math.max(0, multiplayerLagStreak - 1);
+            }
+
+            const canToggle = now - lastLagToggleAt > 2500;
+            if (!multiplayerLagMode && multiplayerLagStreak >= MULTI_LAG_STREAK && canToggle) {
+                multiplayerLagMode = true;
+                lastLagToggleAt = now;
+                applyPerformanceProfile();
+            } else if (multiplayerLagMode && multiplayerLagStreak === 0 && timeSinceNet < 600 && canToggle) {
+                multiplayerLagMode = false;
+                lastLagToggleAt = now;
+                applyPerformanceProfile();
+            }
         }
 
         function updateConnectionIndicator() {
@@ -7018,6 +7742,9 @@
 
         function leaveMultiplayer() {
             isMultiplayer = false;
+            multiplayerLagMode = false;
+            multiplayerLagStreak = 0;
+            lastLagToggleAt = 0;
             applyPerformanceProfile();
             gameRunning = false;
 

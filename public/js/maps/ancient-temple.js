@@ -1,98 +1,27 @@
 /**
- * Ancient Temple Map Module
- * Mystical ruins with ritual circles and ancient power zones
- * UNIMPLEMENTED - Structural code only
+ * Ancient Temple Map Configuration
+ * Sandstone terrain with warm golden tones and temple structures
  */
 
-export class AncientTempleMap {
-  constructor(config = {}) {
-    this.id = 'ancient-temple';
-    this.name = 'Ancient Temple';
-    this.width = config.width || 360;
-    this.height = config.height || 360;
-    this.ritualCircles = [];
-  }
+export const config = {
+  id: 'ancient-temple',
+  name: 'Ancient Temple',
+  roomId: 'arena-temple',
+  description: 'A sacred temple with sandstone terrain and golden light.',
+  terrain: { hillScale: 0.7, hillAmp: 0.6, detailAmp: 0.5 },
+  fogColor: 0xcc9966,
+  skyColor: 0xddaa77,
+  treeDensity: 12,
+  rockDensity: 35,
+  hasPlaza: true,
+  hasBuildings: true,
+  groundTint: { base: 0xb89860, dark: 0x8a7040, light: 0xd4b878, dirt: 0xa08050 },
+  spawnPoints: [
+    { x: 55, y: 8, z: 55 },
+    { x: -55, y: 8, z: -55 },
+    { x: 55, y: 8, z: -55 },
+    { x: -55, y: 8, z: 55 },
+  ],
+};
 
-  /**
-   * Generate temple architecture
-   * TODO: Create ancient temple mesh
-   */
-  generateTempleStructure() {
-    // TODO: Create main temple building
-    // TODO: Generate altar area
-    // TODO: Create temple decorations
-  }
-
-  /**
-   * Create ritual circles
-   * TODO: Generate magical circles
-   */
-  createRitualCircles() {
-    // TODO: Generate circle geometry
-    // TODO: Setup circle detection zones
-    // TODO: Create circle visual effects
-  }
-
-  /**
-   * Initialize curse zones
-   * TODO: Setup ancient curse areas
-   */
-  initializeCurseZones() {
-    // TODO: Generate curse area boundaries
-    // TODO: Setup curse effect application
-    // TODO: Create curse visual effects
-  }
-
-  /**
-   * Create temporal distortion zones
-   * TODO: Setup time manipulation areas
-   */
-  createTemporalDistortion() {
-    // TODO: Generate time distortion areas
-    // TODO: Setup time manipulation mechanics
-    // TODO: Create temporal visual effects
-  }
-
-  /**
-   * Initialize guardian constructs
-   * TODO: Spawn temple guardians
-   */
-  initializeGuardians() {
-    // TODO: Create guardian AI entities
-    // TODO: Setup guardian patrol patterns
-    // TODO: Setup guardian combat behavior
-  }
-
-  /**
-   * Get power boost in circle
-   * TODO: Check for ritual circle bonuses
-   */
-  getPowerBoostInCircle(position) {
-    // TODO: Detect if player is in ritual circle
-    // TODO: Calculate buff magnitude
-    // TODO: Return power boost modifier
-    return { damageBoost: 1, speedBoost: 1 };
-  }
-
-  /**
-   * Apply curse effect
-   * TODO: Apply debuffs to player
-   */
-  applyCurseEffect(player, curseType) {
-    // TODO: Determine curse type
-    // TODO: Apply status effect
-    // TODO: Setup curse duration
-  }
-
-  /**
-   * Update temple hazards
-   * TODO: Cycle active effects
-   */
-  update(deltaTime) {
-    // TODO: Update curse zones
-    // TODO: Update temporal distortion
-    // TODO: Update guardian AI
-  }
-}
-
-export default AncientTempleMap;
+export default config;

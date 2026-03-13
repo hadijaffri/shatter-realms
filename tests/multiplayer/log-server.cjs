@@ -5,10 +5,8 @@ const { execSync } = require('child_process');
 
 const PORT = Number(process.env.LOG_SERVER_PORT || 8787);
 const logsDir = path.resolve(__dirname, 'runs');
-const activeLabel = process.env.STRESS_LABEL || '25m';
-
-const summaryPath = path.join(logsDir, `stress-${activeLabel}-summary.log`);
-const detailPath = path.join(logsDir, `stress-${activeLabel}-detail.log`);
+const envLabel = process.env.STRESS_LABEL || null;
+const defaultLabel = envLabel || '25m';
 
 function readText(filePath) {
   try {
@@ -16,6 +14,57 @@ function readText(filePath) {
   } catch (_e) {
     return '';
   }
+}
+
+function listSummaryFiles() {
+  try {
+    return fs.readdirSync(logsDir).filter(name => name.startsWith('stress-') && name.endsWith('-summary.log'));
+  } catch (_e) {
+    return [];
+  }
+}
+
+function labelFromSummaryFile(file) {
+  return file.slice('stress-'.length, -'-summary.log'.length);
+}
+
+function pickLatestSummary() {
+  const files = listSummaryFiles();
+  let latestFile = null;
+  let latestTime = 0;
+  for (const file of files) {
+    try {
+      const fullPath = path.join(logsDir, file);
+      const stat = fs.statSync(fullPath);
+      if (stat.mtimeMs > latestTime) {
+        latestTime = stat.mtimeMs;
+        latestFile = file;
+      }
+    } catch (_e) {
+      // ignore unreadable files
+    }
+  }
+  if (!latestFile) return null;
+  const label = labelFromSummaryFile(latestFile);
+  return {
+    label,
+    summaryPath: path.join(logsDir, latestFile),
+    detailPath: path.join(logsDir, `stress-${label}-detail.log`)
+  };
+}
+
+function resolveLogPaths() {
+  const preferredSummary = path.join(logsDir, `stress-${defaultLabel}-summary.log`);
+  const preferredDetail = path.join(logsDir, `stress-${defaultLabel}-detail.log`);
+
+  if (envLabel && fs.existsSync(preferredSummary)) {
+    return { label: defaultLabel, summaryPath: preferredSummary, detailPath: preferredDetail };
+  }
+
+  const latest = pickLatestSummary();
+  if (latest) return latest;
+
+  return { label: defaultLabel, summaryPath: preferredSummary, detailPath: preferredDetail };
 }
 
 function parseRemaining(summaryText) {
@@ -77,7 +126,7 @@ function respondHtml(res, html, status = 200) {
   res.end(html);
 }
 
-function pageTemplate() {
+function pageTemplate(label) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -102,7 +151,7 @@ function pageTemplate() {
   </style>
 </head>
 <body>
-  <h1>${activeLabel.toUpperCase()} Stress Remaining</h1>
+  <h1>${label.toUpperCase()} Stress Remaining</h1>
   <div class="meta" id="meta">Loading status...</div>
   <div class="row">
     <button onclick="refreshAll()">Refresh</button>
@@ -124,7 +173,7 @@ function pageTemplate() {
     let auto = true;
     let timer = null;
     async function loadStatus() {
-      const r = await fetch('/status', { cache: 'no-store' });
+      const r = await fetch('/status?t=' + Date.now(), { cache: 'no-store' });
       return r.json();
     }
     function formatNumber(value) {
@@ -144,9 +193,7 @@ function pageTemplate() {
           ' | Updated: ' + (status.files.summary.updated || 'n/a');
         if (remaining) {
           document.getElementById('remainingValue').textContent = formatNumber(remaining.remaining);
-          document.getElementById('remainingSub').textContent =
-            'Executed: ' + formatNumber(remaining.executed) +
-            ' | Total: ' + formatNumber(remaining.total);
+          document.getElementById('remainingSub').textContent = '';
         } else {
           document.getElementById('remainingValue').textContent = 'n/a';
           document.getElementById('remainingSub').textContent = 'No summary data found.';
@@ -173,9 +220,10 @@ function pageTemplate() {
 
 const server = http.createServer((req, res) => {
   const url = (req.url || '/').split('?')[0];
+  const { label, summaryPath, detailPath } = resolveLogPaths();
 
   if (url === '/' || url === '/index.html') {
-    return respondHtml(res, pageTemplate());
+    return respondHtml(res, pageTemplate(label));
   }
   if (url === '/summary') {
     return respondText(res, readText(summaryPath) || '(no summary log yet)');
@@ -187,9 +235,9 @@ const server = http.createServer((req, res) => {
     const summaryText = readText(summaryPath);
     const remaining = parseRemaining(summaryText);
     return respondJson(res, {
-      label: activeLabel,
+      label,
       orchestratorRunning: isNodeRunning('run-stress-orchestrator.cjs'),
-      runnerRunning: isNodeRunning('stress-test-runner.cjs --iterations 10000'),
+      runnerRunning: isNodeRunning('stress-test-runner.cjs'),
       remaining,
       files: {
         summary: getMeta(summaryPath),
@@ -200,12 +248,13 @@ const server = http.createServer((req, res) => {
   if (url === '/remaining') {
     const summaryText = readText(summaryPath);
     const remaining = parseRemaining(summaryText);
-    return respondJson(res, { label: activeLabel, remaining });
+    return respondJson(res, { label, remaining });
   }
 
   return respondText(res, 'Not found', 404);
 });
 
 server.listen(PORT, () => {
-  console.log(`Stress log server running at http://localhost:${PORT} for label ${activeLabel}`);
+  const mode = envLabel ? `label ${defaultLabel}` : 'latest label auto-detect';
+  console.log(`Stress log server running at http://localhost:${PORT} (${mode})`);
 });

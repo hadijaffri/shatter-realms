@@ -18,6 +18,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       coins: 100,
       ownedItems: ['sword', 'fireball'],
+      ownedAvatars: ['body_blue', 'head_default', 'aura_none'],
+      equippedAvatar: { bodyColor: 'body_blue', headStyle: 'head_default', aura: 'aura_none' },
     });
   }
 
@@ -30,6 +32,8 @@ export default async function handler(req, res) {
         success: true,
         coins: data.coins,
         ownedItems: data.ownedItems,
+        ownedAvatars: data.ownedAvatars,
+        equippedAvatar: data.equippedAvatar,
       });
     } catch (_e) {
       return res.status(400).json({ error: 'Invalid data' });

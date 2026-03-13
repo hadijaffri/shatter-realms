@@ -1,88 +1,27 @@
 /**
- * Sky Fortress Map Module
- * Elevated castle in clouds with narrow walkways and wind currents
- * UNIMPLEMENTED - Structural code only
+ * Sky Fortress Map Configuration
+ * Elevated terrain in the clouds with gentle rolling hills and golden stone
  */
 
-export class SkyFortressMap {
-  constructor(config = {}) {
-    this.id = 'sky-fortress';
-    this.name = 'Sky Fortress';
-    this.width = config.width || 320;
-    this.height = config.height || 320;
-    this.fortressStructures = [];
-  }
+export const config = {
+  id: 'sky-fortress',
+  name: 'Sky Fortress',
+  roomId: 'arena-sky',
+  description: 'A majestic fortress suspended in the clouds with gentle terrain.',
+  terrain: { hillScale: 0.3, hillAmp: 0.2, detailAmp: 0.1 },
+  fogColor: 0xddeeff,
+  skyColor: 0x88ccff,
+  treeDensity: 2,
+  rockDensity: 15,
+  hasPlaza: true,
+  hasBuildings: false,
+  groundTint: { base: 0xe8dcc0, dark: 0xc8b8a0, light: 0xf5edd8, dirt: 0xbba860 },
+  spawnPoints: [
+    { x: 50, y: 15, z: 50 },
+    { x: -50, y: 15, z: -50 },
+    { x: 50, y: 15, z: -50 },
+    { x: -50, y: 15, z: 50 },
+  ],
+};
 
-  /**
-   * Generate fortress architecture
-   * TODO: Create castle towers and walls
-   */
-  generateFortressStructure() {
-    // TODO: Create castle mesh
-    // TODO: Generate tower structures
-    // TODO: Create battlement meshes
-  }
-
-  /**
-   * Create bridge network
-   * TODO: Generate narrow walkways
-   */
-  createBridgeNetwork() {
-    // TODO: Generate bridge meshes
-    // TODO: Create bridge collision geometry
-    // TODO: Setup bridge physics
-  }
-
-  /**
-   * Initialize wind current system
-   * TODO: Setup wind force fields
-   */
-  initializeWindCurrents() {
-    // TODO: Create wind vector field
-    // TODO: Setup wind force application zones
-    // TODO: Create wind particle effects
-  }
-
-  /**
-   * Create lightning strike system
-   * TODO: Setup storm cloud effects
-   */
-  createLightningSystem() {
-    // TODO: Setup lightning spawn zones
-    // TODO: Create lightning strike patterns
-    // TODO: Setup lightning damage areas
-  }
-
-  /**
-   * Get wind force at position
-   * TODO: Calculate wind resistance
-   */
-  getWindForceAtPosition(position) {
-    // TODO: Sample wind field at position
-    // TODO: Apply cloud height modifiers
-    // TODO: Return wind force vector
-    return { x: 0, y: 0, z: 0 };
-  }
-
-  /**
-   * Update storm system
-   * TODO: Cycle lightning and wind
-   */
-  update(deltaTime) {
-    // TODO: Update wind intensity
-    // TODO: Check lightning strike conditions
-    // TODO: Update cloud particle effects
-  }
-
-  /**
-   * Check falling off fortress
-   * TODO: Detect players leaving safe zones
-   */
-  checkFallZone(position) {
-    // TODO: Check if below fortress height
-    // TODO: Check if outside boundary
-    return false;
-  }
-}
-
-export default SkyFortressMap;
+export default config;
