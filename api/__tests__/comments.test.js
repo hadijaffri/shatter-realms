@@ -7,8 +7,7 @@ describe('Comments API validation', () => {
       .trim()
       .slice(0, 20) || 'Guest';
 
-  const sanitizeMessage = raw =>
-    (raw || '').toString().replace(/[<>]/g, '').trim().slice(0, 280);
+  const sanitizeMessage = raw => (raw || '').toString().replace(/[<>]/g, '').trim().slice(0, 280);
 
   test('should sanitize and default invalid names', () => {
     expect(sanitizeName('Alice')).toBe('Alice');
@@ -34,4 +33,3 @@ describe('Comments API validation', () => {
     expect(sanitizeMessage('   ')).toBe('');
   });
 });
-

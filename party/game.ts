@@ -11,6 +11,7 @@ interface Player {
   deaths: number;
   weapon: string;
   lastUpdate: number;
+  avatar: { bodyColor: string; headStyle: string; aura: string } | null;
 }
 
 interface GameState {
@@ -19,6 +20,7 @@ interface GameState {
   matchDuration: number; // 5 minutes in ms
   matchEnded: boolean;
   winner: string | null;
+  map: string | null;
 }
 
 export default class GameServer implements Party.Server {
@@ -30,6 +32,7 @@ export default class GameServer implements Party.Server {
     matchDuration: 5 * 60 * 1000, // 5 minutes
     matchEnded: false,
     winner: null,
+    map: null,
   };
 
   lastTimerUpdate: number = 0;
@@ -147,7 +150,13 @@ export default class GameServer implements Party.Server {
       deaths: 0,
       weapon: data.weapon || 'sword',
       lastUpdate: Date.now(),
+      avatar: data.avatar || null,
     };
+
+    // First player sets the map
+    if (!this.state.map && data.mapId) {
+      this.state.map = data.mapId;
+    }
 
     this.state.players[conn.id] = player;
     await this.saveState();
@@ -167,6 +176,7 @@ export default class GameServer implements Party.Server {
         matchStartTime: this.state.matchStartTime,
         matchDuration: this.state.matchDuration,
         timeRemaining: this.getTimeRemaining(),
+        map: this.state.map,
       })
     );
 
@@ -440,6 +450,7 @@ export default class GameServer implements Party.Server {
       matchDuration: 5 * 60 * 1000,
       matchEnded: false,
       winner: null,
+      map: null,
     };
     this.lastTimerUpdate = 0;
     this.chatRateLimit = {};

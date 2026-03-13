@@ -87,13 +87,18 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body || '{}');
-        const name = (payload.name || 'Guest')
+        const name =
+          (payload.name || 'Guest')
+            .toString()
+            .replace(/[<>]/g, '')
+            .replace(/[^\w\s-]/g, '')
+            .trim()
+            .slice(0, 20) || 'Guest';
+        const message = (payload.message || '')
           .toString()
           .replace(/[<>]/g, '')
-          .replace(/[^\w\s-]/g, '')
           .trim()
-          .slice(0, 20) || 'Guest';
-        const message = (payload.message || '').toString().replace(/[<>]/g, '').trim().slice(0, 280);
+          .slice(0, 280);
 
         if (!message) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
