@@ -1395,6 +1395,14 @@
             }).join('');
         }
 
+        // Coin packages for mapping deficit to the right purchase
+        const coinPackages = [
+            { id: 'small', coins: 500, price: 4.99 },
+            { id: 'medium', coins: 1200, price: 9.99 },
+            { id: 'large', coins: 2500, price: 19.99 },
+            { id: 'mega', coins: 6000, price: 49.99 }
+        ];
+
         function buyAvatarItem(category, slotKey, itemId) {
             const item = getAvatarItem(category, itemId);
             if (!item) return;
@@ -1403,7 +1411,20 @@
                 return;
             }
             if (inventory.coins < item.price) {
-                showNotification('Not enough coins for this avatar item.', '#ff4444');
+                const deficit = item.price - inventory.coins;
+                const pkg = coinPackages.find(p => p.coins >= deficit) || coinPackages[coinPackages.length - 1];
+                showNotification(`Need ${deficit} more coins. Opening shop...`, '#ffaa00');
+                openShop();
+                // Highlight the recommended package after shop renders
+                setTimeout(() => {
+                    const pkgEls = document.querySelectorAll('.coin-package');
+                    const idx = coinPackages.indexOf(pkg);
+                    if (pkgEls[idx]) {
+                        pkgEls[idx].style.border = '2px solid gold';
+                        pkgEls[idx].style.boxShadow = '0 0 12px rgba(255,215,0,0.5)';
+                        pkgEls[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
                 return;
             }
             inventory.coins -= item.price;
@@ -8998,6 +9019,13 @@
             applyPerformanceProfile();
             enterFullscreen();
             closeCommentsPanel();
+            // Ensure all overlay panels are hidden before starting
+            const soloSelect = document.getElementById('soloMapSelect');
+            if (soloSelect) soloSelect.style.display = 'none';
+            const soloConfirm = document.getElementById('soloMapConfirm');
+            if (soloConfirm) soloConfirm.style.display = 'none';
+            const votePanel = document.getElementById('multiplayerMapVote');
+            if (votePanel) votePanel.style.display = 'none';
             renderer.domElement.style.display = 'block';
             document.getElementById('menu').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
