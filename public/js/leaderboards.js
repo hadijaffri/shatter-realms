@@ -68,7 +68,7 @@
 
   function fetchLeaderboards() {
     // Fetch from API
-    fetch('/api/leaderboard?period=' + activeTab)
+    fetch('/api/game-data?endpoint=leaderboard&period=' + activeTab)
       .then(function (res) {
         return res.json();
       })
@@ -118,7 +118,7 @@
   }
 
   function submitScore(name, score, wave, kills) {
-    fetch('/api/leaderboard', {
+    fetch('/api/game-data?endpoint=leaderboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
