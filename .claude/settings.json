@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "MSGS=$(\"/mnt/c/Program Files/nodejs/node.exe\" \"C:\\Users\\hadi\\.agent-comms\\bin\\agent-comms-cli.cjs\" --project shatter-realms read --for claude --limit 5 2>/dev/null) && echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"UserPromptSubmit\\\",\\\"additionalContext\\\":\\\"Agent board messages: $MSGS\\\"}}\"",
+            "timeout": 10,
+            "statusMessage": "Reading agent board..."
+          },
+          {
+            "type": "command",
+            "command": "\"/mnt/c/Program Files/nodejs/node.exe\" \"C:\\Users\\hadi\\.agent-comms\\bin\\agent-comms-cli.cjs\" --project shatter-realms presence --agent claude --status active --task \"responding to user\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "Setting agent presence..."
+          }
+        ]
+      }
+    ]
+  }
+}

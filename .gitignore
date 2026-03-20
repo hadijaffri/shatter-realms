@@ -30,3 +30,6 @@ poetry.lock
 
 .vercel
 .env*.local
+
+# Claude Code local settings (personal, not shared)
+.claude/settings.local.json
