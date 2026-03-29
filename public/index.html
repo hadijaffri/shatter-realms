@@ -24,6 +24,8 @@
             <button class="menu-btn shop-btn" onclick="openShop()">🛒 Shop</button>
             <button class="menu-btn" onclick="openInventory()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">📦 Inventory</button>
             <button class="menu-btn" onclick="openFriendsPanel()" style="background: linear-gradient(135deg, #3498db, #2980b9);">👥 Friends</button>
+            <button class="menu-btn" onclick="openPromoCodeModal()" style="background: linear-gradient(135deg, #ff6b00, #ff2d00);">🎁 Promo Code</button>
+            <button class="menu-btn" onclick="openAvatarCustomizer()" style="background: linear-gradient(135deg, #e91e63, #9c27b0);">👤 Avatar</button>
             <button class="menu-btn settings-btn" onclick="openSettings()">⚙️ Settings</button>
             <button class="menu-btn quit-btn" onclick="quitGame()">🚪 Quit</button>
             <div id="menuCoins" style="color: gold; margin-top: 12px; font-size: 16px;">💰 0 <button id="menuAddCoins" onclick="openCustomCoinModal()" style="background: gold; color: #000; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 16px; font-weight: bold; cursor: pointer; margin-left: 5px;">+</button></div>
@@ -1090,10 +1092,228 @@
             { id: 'holy_lance', price: 580 }
         ];
         
+        // Promo codes system - 50 codes with various rewards
+        const promoCodes = {
+            'SHATTER100': { coins: 100, desc: '100 free coins!' },
+            'WELCOME': { coins: 200, desc: 'Welcome bonus!' },
+            'REALM500': { coins: 500, desc: '500 coin reward!' },
+            'WARRIOR': { coins: 150, item: 'axe', desc: 'Free axe + 150 coins!' },
+            'MAGE': { coins: 150, item: 'iceball', desc: 'Free iceball + 150 coins!' },
+            'ASSASSIN': { coins: 150, item: 'dagger', desc: 'Free dagger + 150 coins!' },
+            'TANKMODE': { coins: 100, item: 'shield', desc: 'Free shield + 100 coins!' },
+            'HEALER': { coins: 100, item: 'medkit', desc: 'Free medkit + 100 coins!' },
+            'SPEEDRUN': { coins: 100, item: 'speedBoost', desc: 'Free speed boost + 100 coins!' },
+            'LEGEND2026': { coins: 1000, desc: '1000 coin jackpot!' },
+            'FIRSTBLOOD': { coins: 250, desc: '250 coins for first blood!' },
+            'BOSSSLAYER': { coins: 300, desc: '300 boss slayer coins!' },
+            'DUNGEON': { coins: 200, item: 'spear', desc: 'Free spear + 200 coins!' },
+            'KNIGHT': { coins: 200, item: 'hammer', desc: 'Free hammer + 200 coins!' },
+            'NINJA': { coins: 150, item: 'shuriken', desc: 'Free shuriken + 150 coins!' },
+            'ARCHER': { coins: 200, item: 'bow', desc: 'Free bow + 200 coins!' },
+            'PYRO': { coins: 250, item: 'molotov', desc: 'Free molotov + 250 coins!' },
+            'BOMBER': { coins: 200, item: 'grenade', desc: 'Free grenade + 200 coins!' },
+            'SUMMONER': { coins: 300, item: 'summon_wolf', desc: 'Free wolf summon + 300 coins!' },
+            'DRAGON': { coins: 500, item: 'summon_dragon', desc: 'Free dragon summon + 500 coins!' },
+            'GOLEM': { coins: 300, item: 'summon_golem', desc: 'Free golem summon + 300 coins!' },
+            'PHOENIX': { coins: 400, item: 'summon_phoenix', desc: 'Free phoenix summon + 400 coins!' },
+            'FLAMEKING': { coins: 200, item: 'flame_sword', desc: 'Free flame sword + 200 coins!' },
+            'FROSTKING': { coins: 200, item: 'frost_axe', desc: 'Free frost axe + 200 coins!' },
+            'THUNDER': { coins: 200, item: 'thunder_hammer', desc: 'Free thunder hammer + 200 coins!' },
+            'SHADOW': { coins: 200, item: 'shadow_scythe', desc: 'Free shadow scythe + 200 coins!' },
+            'HOLY': { coins: 200, item: 'holy_lance', desc: 'Free holy lance + 200 coins!' },
+            'WIND': { coins: 150, item: 'wind_blade', desc: 'Free wind blade + 150 coins!' },
+            'VENOM': { coins: 150, item: 'venom_dagger', desc: 'Free venom dagger + 150 coins!' },
+            'EARTH': { coins: 200, item: 'earth_mace', desc: 'Free earth mace + 200 coins!' },
+            'RAGE': { coins: 200, item: 'rage', desc: 'Free rage ability + 200 coins!' },
+            'INVISIBLE': { coins: 300, item: 'invisibility', desc: 'Free invisibility + 300 coins!' },
+            'TELEPORT': { coins: 250, item: 'teleport', desc: 'Free teleport + 250 coins!' },
+            'REFLECT': { coins: 200, item: 'reflect', desc: 'Free reflect + 200 coins!' },
+            'VAMPIRE': { coins: 300, item: 'lifesteal', desc: 'Free lifesteal + 300 coins!' },
+            'TIMESTOP': { coins: 500, item: 'timestop', desc: 'Free timestop + 500 coins!' },
+            'BERSERK': { coins: 300, item: 'berserk', desc: 'Free berserk + 300 coins!' },
+            'FORT': { coins: 200, item: 'fortify', desc: 'Free fortify + 200 coins!' },
+            'REGEN': { coins: 250, item: 'regenerate', desc: 'Free regenerate + 250 coins!' },
+            'ENERGY': { coins: 150, item: 'energize', desc: 'Free energize + 150 coins!' },
+            'CLONEWARS': { coins: 200, item: 'clone', desc: 'Free clone + 200 coins!' },
+            'STORMCALL': { coins: 200, item: 'lightning', desc: 'Free lightning + 200 coins!' },
+            'BLIZZARD': { coins: 200, item: 'frost_nova', desc: 'Free frost nova + 200 coins!' },
+            'INFERNO': { coins: 300, item: 'fire_storm', desc: 'Free fire storm + 300 coins!' },
+            'SUPERNOVA': { coins: 1000, desc: '1000 supernova coins!' },
+            'DARKARTS': { coins: 200, item: 'shadow', desc: 'Free shadow spell + 200 coins!' },
+            'NUKE': { coins: 500, item: 'nuke', desc: 'Free nuke + 500 coins!' },
+            'CROSSBOW': { coins: 200, item: 'crossbow', desc: 'Free crossbow + 200 coins!' },
+            'KATANA': { coins: 200, item: 'katana', desc: 'Free katana + 200 coins!' },
+            'CHAINSAW': { coins: 300, item: 'chainsaw', desc: 'Free chainsaw + 300 coins!' }
+        };
+        let redeemedCodes = JSON.parse(localStorage.getItem('redeemedCodes') || '[]');
+
+        function openPromoCodeModal() {
+            const existing = document.getElementById('promoModal');
+            if (existing) existing.remove();
+            const modal = document.createElement('div');
+            modal.id = 'promoModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid #a0f;border-radius:12px;padding:30px;text-align:center;max-width:400px;width:90%;">
+                    <h2 style="color:#a0f;margin:0 0 15px;">🎁 PROMO CODE</h2>
+                    <input id="promoInput" type="text" placeholder="Enter code..." style="width:80%;padding:12px;border-radius:8px;border:2px solid #a0f;background:#0a0a1a;color:#fff;font-size:16px;text-align:center;text-transform:uppercase;" />
+                    <div style="margin-top:15px;">
+                        <button onclick="redeemPromoCode()" style="background:linear-gradient(135deg,#a0f,#60f);color:#fff;border:none;padding:12px 30px;border-radius:8px;font-size:16px;cursor:pointer;margin-right:10px;">Redeem</button>
+                        <button onclick="document.getElementById('promoModal').remove()" style="background:#333;color:#fff;border:none;padding:12px 30px;border-radius:8px;font-size:16px;cursor:pointer;">Close</button>
+                    </div>
+                    <div id="promoResult" style="margin-top:15px;font-size:14px;"></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('promoInput').focus();
+        }
+
+        function redeemPromoCode() {
+            const input = document.getElementById('promoInput');
+            const result = document.getElementById('promoResult');
+            const code = input.value.trim().toUpperCase();
+
+            if (!code) { result.innerHTML = '<span style="color:#f44;">Enter a code!</span>'; return; }
+            if (redeemedCodes.includes(code)) { result.innerHTML = '<span style="color:#f44;">Code already redeemed!</span>'; return; }
+            if (!promoCodes[code]) { result.innerHTML = '<span style="color:#f44;">Invalid code!</span>'; return; }
+
+            const reward = promoCodes[code];
+            inventory.coins += reward.coins;
+            if (reward.item && !inventory.ownedItems.includes(reward.item)) {
+                inventory.ownedItems.push(reward.item);
+                const emptySlot = hotbar.findIndex(s => s === null);
+                if (emptySlot !== -1) hotbar[emptySlot] = reward.item;
+            }
+            redeemedCodes.push(code);
+            localStorage.setItem('redeemedCodes', JSON.stringify(redeemedCodes));
+            saveCoinsToCloud();
+            updateShopUI();
+            setupHotbar();
+            result.innerHTML = `<span style="color:#0f0;">✅ ${reward.desc}</span>`;
+            input.value = '';
+            document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+        }
+
+        // Avatar customization system
+        const avatarSkins = {
+            head: [
+                { id: 'default_head', name: 'Default', color: 0xffcc99, price: 0 },
+                { id: 'pale_head', name: 'Pale', color: 0xffe0bd, price: 50 },
+                { id: 'tan_head', name: 'Tan', color: 0xd2a679, price: 50 },
+                { id: 'dark_head', name: 'Dark', color: 0x8d5524, price: 50 },
+                { id: 'blue_head', name: 'Frost', color: 0x88ccff, price: 200 },
+                { id: 'red_head', name: 'Demon', color: 0xff4444, price: 300 },
+                { id: 'green_head', name: 'Orc', color: 0x66bb6a, price: 200 },
+                { id: 'gold_head', name: 'Golden', color: 0xffd700, price: 500 }
+            ],
+            body: [
+                { id: 'default_body', name: 'Blue Armor', color: 0x2244aa, price: 0 },
+                { id: 'red_body', name: 'Red Armor', color: 0xaa2244, price: 100 },
+                { id: 'green_body', name: 'Forest', color: 0x2e7d32, price: 100 },
+                { id: 'purple_body', name: 'Royal', color: 0x7b1fa2, price: 150 },
+                { id: 'black_body', name: 'Shadow', color: 0x1a1a1a, price: 200 },
+                { id: 'white_body', name: 'Holy', color: 0xeeeeee, price: 200 },
+                { id: 'gold_body', name: 'Golden', color: 0xffd700, price: 500 },
+                { id: 'rainbow_body', name: 'Prismatic', color: 0xff00ff, price: 800 }
+            ],
+            arms: [
+                { id: 'default_arms', name: 'Match Body', color: null, price: 0 },
+                { id: 'steel_arms', name: 'Steel Gauntlets', color: 0x888888, price: 100 },
+                { id: 'gold_arms', name: 'Gold Gauntlets', color: 0xffd700, price: 300 },
+                { id: 'dark_arms', name: 'Shadow Arms', color: 0x222222, price: 200 },
+                { id: 'fire_arms', name: 'Flame Arms', color: 0xff4400, price: 250 },
+                { id: 'ice_arms', name: 'Frost Arms', color: 0x44aaff, price: 250 }
+            ],
+            legs: [
+                { id: 'default_legs', name: 'Dark Pants', color: 0x333355, price: 0 },
+                { id: 'brown_legs', name: 'Leather', color: 0x795548, price: 80 },
+                { id: 'black_legs', name: 'Shadow', color: 0x111111, price: 100 },
+                { id: 'white_legs', name: 'Holy', color: 0xdddddd, price: 100 },
+                { id: 'red_legs', name: 'Blood', color: 0x880000, price: 150 },
+                { id: 'gold_legs', name: 'Golden', color: 0xffd700, price: 400 }
+            ]
+        };
+
+        let playerAvatar = JSON.parse(localStorage.getItem('playerAvatar') || JSON.stringify({
+            head: 'default_head', body: 'default_body', arms: 'default_arms', legs: 'default_legs'
+        }));
+        let ownedSkins = JSON.parse(localStorage.getItem('ownedSkins') || '["default_head","default_body","default_arms","default_legs"]');
+
+        function getAvatarColors() {
+            const findSkin = (part, id) => avatarSkins[part].find(s => s.id === id) || avatarSkins[part][0];
+            const bodySkin = findSkin('body', playerAvatar.body);
+            const armSkin = findSkin('arms', playerAvatar.arms);
+            return {
+                skinColor: findSkin('head', playerAvatar.head).color,
+                bodyColor: bodySkin.color,
+                armColor: armSkin.color || bodySkin.color,
+                legColor: findSkin('legs', playerAvatar.legs).color
+            };
+        }
+
+        function openAvatarCustomizer() {
+            const existing = document.getElementById('avatarModal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'avatarModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+            let html = `<div style="background:#1a1a2e;border:2px solid #e91e63;border-radius:12px;padding:25px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">
+                <h2 style="color:#e91e63;margin:0 0 15px;text-align:center;">👤 AVATAR CUSTOMIZER</h2>
+                <div style="color:gold;text-align:center;margin-bottom:15px;">💰 ${inventory.coins} coins</div>`;
+
+            ['head', 'body', 'arms', 'legs'].forEach(part => {
+                const partLabel = part.charAt(0).toUpperCase() + part.slice(1);
+                html += `<div style="margin-bottom:15px;">
+                    <h3 style="color:#aaa;margin:0 0 8px;">${partLabel}</h3>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+                avatarSkins[part].forEach(skin => {
+                    const owned = ownedSkins.includes(skin.id);
+                    const equipped = playerAvatar[part] === skin.id;
+                    const canAfford = inventory.coins >= skin.price;
+                    const colorHex = '#' + (skin.color || 0x2244aa).toString(16).padStart(6, '0');
+                    const border = equipped ? '3px solid #0f0' : owned ? '2px solid #666' : '2px solid #333';
+                    html += `<div onclick="avatarAction('${part}','${skin.id}',${skin.price})" style="cursor:pointer;background:#111;border:${border};border-radius:8px;padding:6px 10px;text-align:center;min-width:70px;">
+                        <div style="width:24px;height:24px;border-radius:50%;background:${colorHex};margin:0 auto 4px;border:1px solid #555;"></div>
+                        <div style="color:#fff;font-size:11px;">${skin.name}</div>
+                        <div style="color:${equipped ? '#0f0' : owned ? '#888' : canAfford ? 'gold' : '#f44'};font-size:10px;">${equipped ? 'Equipped' : owned ? 'Owned' : '💰' + skin.price}</div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            });
+
+            html += `<div style="text-align:center;margin-top:15px;">
+                <button onclick="document.getElementById('avatarModal').remove()" style="background:#e91e63;color:#fff;border:none;padding:12px 30px;border-radius:8px;font-size:16px;cursor:pointer;">Done</button>
+            </div></div>`;
+
+            modal.innerHTML = html;
+            document.body.appendChild(modal);
+        }
+
+        function avatarAction(part, skinId, price) {
+            if (ownedSkins.includes(skinId)) {
+                // Equip
+                playerAvatar[part] = skinId;
+                localStorage.setItem('playerAvatar', JSON.stringify(playerAvatar));
+                openAvatarCustomizer(); // Refresh UI
+            } else if (inventory.coins >= price) {
+                // Buy and equip
+                inventory.coins -= price;
+                ownedSkins.push(skinId);
+                playerAvatar[part] = skinId;
+                localStorage.setItem('playerAvatar', JSON.stringify(playerAvatar));
+                localStorage.setItem('ownedSkins', JSON.stringify(ownedSkins));
+                saveCoinsToCloud();
+                document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+                openAvatarCustomizer(); // Refresh UI
+            }
+        }
+
         let hotbar = ['sword', 'fireball', null, null, null, null];
         let selectedSlot = 0;
         let itemCooldowns = {};
-        
+
         // Input
         const keys = {};
         let isDragging = false;
@@ -1543,7 +1763,14 @@
             ];
 
             buildingData.forEach(b => {
-                const terrainY = getTerrainHeight(b.x, b.z);
+                // Multi-point terrain sampling so buildings sit on the highest point (no floating)
+                const terrainY = Math.max(
+                    getTerrainHeight(b.x, b.z),
+                    getTerrainHeight(b.x + 2, b.z),
+                    getTerrainHeight(b.x - 2, b.z),
+                    getTerrainHeight(b.x, b.z + 2),
+                    getTerrainHeight(b.x, b.z - 2)
+                );
                 createBuilding(b.x, b.z, b.type, terrainY);
             });
 
@@ -4818,13 +5045,25 @@
             playerState.position.x = Math.max(-120, Math.min(120, playerState.position.x));
             playerState.position.z = Math.max(-120, Math.min(120, playerState.position.z));
             
-            // Gravity and terrain following
-            const terrainY = getTerrainHeight(playerState.position.x, playerState.position.z);
+            // Gravity and terrain following (multi-point sampling prevents clipping under hills)
+            const px = playerState.position.x;
+            const pz = playerState.position.z;
+            const terrainY = Math.max(
+                getTerrainHeight(px, pz),
+                getTerrainHeight(px + 0.4, pz),
+                getTerrainHeight(px - 0.4, pz),
+                getTerrainHeight(px, pz + 0.4),
+                getTerrainHeight(px, pz - 0.4),
+                getTerrainHeight(px + 0.3, pz + 0.3),
+                getTerrainHeight(px - 0.3, pz - 0.3),
+                getTerrainHeight(px + 0.3, pz - 0.3),
+                getTerrainHeight(px - 0.3, pz + 0.3)
+            );
             const groundY = terrainY + 1.7;
-            
+
             playerState.velocity.y -= 0.004;
             playerState.position.y += playerState.velocity.y;
-            
+
             if (playerState.position.y <= groundY) {
                 playerState.position.y = groundY;
                 playerState.velocity.y = 0;
@@ -4885,18 +5124,43 @@
         function updateEnemies(dt) {
             enemies.forEach((e, idx) => {
                 if (!e.mesh || e.dying) return;
-                
+
                 const toPlayer = playerState.position.clone().sub(e.mesh.position);
                 toPlayer.y = 0;
                 const dist = toPlayer.length();
                 toPlayer.normalize();
 
+                // Flanking: each enemy gets a unique offset angle based on its index
+                // so they approach from different directions instead of beelining
+                if (e.flankAngle === undefined) {
+                    e.flankAngle = ((idx % 8) / 8) * Math.PI * 2; // spread across 8 directions
+                    e.flankRadius = 3 + (idx % 4); // stagger approach distances
+                }
+
+                let moveX = toPlayer.x;
+                let moveZ = toPlayer.z;
+
+                // When far away, circle toward a flanking position
+                if (dist > e.flankRadius) {
+                    const targetX = playerState.position.x + Math.cos(e.flankAngle) * e.flankRadius;
+                    const targetZ = playerState.position.z + Math.sin(e.flankAngle) * e.flankRadius;
+                    const toFlank = new THREE.Vector2(targetX - e.mesh.position.x, targetZ - e.mesh.position.z);
+                    const flankDist = toFlank.length();
+                    if (flankDist > 0.5) {
+                        toFlank.normalize();
+                        moveX = toFlank.x;
+                        moveZ = toFlank.y;
+                    }
+                }
+                // Slowly drift the flank angle so enemies circle the player
+                e.flankAngle += dt * 0.0003 * (idx % 2 === 0 ? 1 : -1);
+
                 let isMoving = false;
 
                 if (dist > 1.3) {
-                    // Calculate new position
-                    let newX = e.mesh.position.x + toPlayer.x * e.speed * dt;
-                    let newZ = e.mesh.position.z + toPlayer.z * e.speed * dt;
+                    // Calculate new position using flanking direction
+                    let newX = e.mesh.position.x + moveX * e.speed * dt;
+                    let newZ = e.mesh.position.z + moveZ * e.speed * dt;
 
                     // Check collision with other enemies
                     let canMove = true;
@@ -4949,9 +5213,13 @@
                     getTerrainHeight(ex + 0.5, ez),
                     getTerrainHeight(ex - 0.5, ez),
                     getTerrainHeight(ex, ez + 0.5),
-                    getTerrainHeight(ex, ez - 0.5)
+                    getTerrainHeight(ex, ez - 0.5),
+                    getTerrainHeight(ex + 0.4, ez + 0.4),
+                    getTerrainHeight(ex - 0.4, ez - 0.4),
+                    getTerrainHeight(ex + 0.4, ez - 0.4),
+                    getTerrainHeight(ex - 0.4, ez + 0.4)
                 );
-                e.mesh.position.y = terrainY + 0.4;
+                e.mesh.position.y = terrainY + 0.5;
 
                 // Face the player
                 e.mesh.lookAt(new THREE.Vector3(playerState.position.x, e.mesh.position.y, playerState.position.z));
@@ -5332,7 +5600,8 @@
                     multiplayerSocket.send(JSON.stringify({
                         type: 'join',
                         name: playerName,
-                        weapon: hotbar[selectedSlot] || 'sword'
+                        weapon: hotbar[selectedSlot] || 'sword',
+                        avatar: getAvatarColors()
                     }));
                 };
 
@@ -5563,9 +5832,16 @@
 
             const group = new THREE.Group();
 
-            // Body
-            const bodyGeo = new THREE.CylinderGeometry(0.3, 0.35, 1.0, 10);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2244aa, roughness: 0.7 });
+            // Avatar colors (use transmitted skin data or defaults)
+            const skinData = playerData.avatar || {};
+            const bodyColor = skinData.bodyColor || 0x2244aa;
+            const skinColor = skinData.skinColor || 0xffcc99;
+            const legColor = skinData.legColor || 0x333355;
+            const armColor = skinData.armColor || bodyColor;
+
+            // Body (torso)
+            const bodyGeo = new THREE.CylinderGeometry(0.28, 0.34, 0.85, 10);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.7 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.position.y = 0.7;
             body.castShadow = true;
@@ -5573,11 +5849,39 @@
 
             // Head
             const headGeo = new THREE.SphereGeometry(0.22, 12, 10);
-            const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc99, roughness: 0.8 });
+            const headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.8 });
             const head = new THREE.Mesh(headGeo, headMat);
-            head.position.y = 1.4;
+            head.position.y = 1.3;
             head.castShadow = true;
             group.add(head);
+
+            // Left Arm
+            const armGeo = new THREE.CylinderGeometry(0.08, 0.09, 0.65, 8);
+            const armMat = new THREE.MeshStandardMaterial({ color: armColor, roughness: 0.7 });
+            const leftArm = new THREE.Mesh(armGeo, armMat);
+            leftArm.position.set(-0.4, 0.75, 0);
+            leftArm.castShadow = true;
+            group.add(leftArm);
+
+            // Right Arm
+            const rightArm = new THREE.Mesh(armGeo, armMat);
+            rightArm.position.set(0.4, 0.75, 0);
+            rightArm.castShadow = true;
+            group.add(rightArm);
+
+            // Left Leg
+            const legGeo = new THREE.CylinderGeometry(0.09, 0.1, 0.6, 8);
+            const legMat = new THREE.MeshStandardMaterial({ color: legColor, roughness: 0.7 });
+            const leftLeg = new THREE.Mesh(legGeo, legMat);
+            leftLeg.position.set(-0.14, 0.15, 0);
+            leftLeg.castShadow = true;
+            group.add(leftLeg);
+
+            // Right Leg
+            const rightLeg = new THREE.Mesh(legGeo, legMat);
+            rightLeg.position.set(0.14, 0.15, 0);
+            rightLeg.castShadow = true;
+            group.add(rightLeg);
 
             // Name tag
             const canvas = document.createElement('canvas');
@@ -5627,7 +5931,13 @@
                 maxHealth: playerData.maxHealth || 100,
                 healthBar: healthFill,
                 targetPosition: new THREE.Vector3(),
-                targetRotation: { x: 0, y: 0 }
+                targetRotation: { x: 0, y: 0 },
+                leftArm: leftArm,
+                rightArm: rightArm,
+                leftLeg: leftLeg,
+                rightLeg: rightLeg,
+                animTime: 0,
+                lastPosition: new THREE.Vector3()
             };
         }
 
@@ -5694,7 +6004,8 @@
                     z: playerState.position.z
                 },
                 rotation: playerState.rotation,
-                weapon: hotbar[selectedSlot] || 'sword'
+                weapon: hotbar[selectedSlot] || 'sword',
+                avatar: getAvatarColors()
             }));
         }
 
@@ -5766,6 +6077,29 @@
                 // Smooth interpolation
                 player.mesh.position.lerp(player.targetPosition, 0.15);
                 player.mesh.rotation.y = player.targetRotation.y || 0;
+
+                // Animate arms and legs when moving
+                if (player.leftArm && player.leftLeg) {
+                    const dx = player.mesh.position.x - (player.lastPosition?.x || player.mesh.position.x);
+                    const dz = player.mesh.position.z - (player.lastPosition?.z || player.mesh.position.z);
+                    const moveDist = Math.sqrt(dx * dx + dz * dz);
+
+                    if (moveDist > 0.01) {
+                        player.animTime = (player.animTime || 0) + dt * 0.012;
+                        const swing = Math.sin(player.animTime) * 0.6;
+                        player.leftArm.rotation.x = swing;
+                        player.rightArm.rotation.x = -swing;
+                        player.leftLeg.rotation.x = -swing * 0.8;
+                        player.rightLeg.rotation.x = swing * 0.8;
+                    } else {
+                        // Idle - reset limbs
+                        player.leftArm.rotation.x *= 0.9;
+                        player.rightArm.rotation.x *= 0.9;
+                        player.leftLeg.rotation.x *= 0.9;
+                        player.rightLeg.rotation.x *= 0.9;
+                    }
+                    player.lastPosition = player.mesh.position.clone();
+                }
 
                 // Make health bar face camera
                 player.mesh.children.forEach(child => {
