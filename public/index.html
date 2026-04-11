@@ -11,22 +11,50 @@
 </head>
 <body>
     <div id="menu">
-        <h1>SHATTERREALMS</h1>
-        <h2>Realism Edition</h2>
+        <div id="menuBgParticles"></div>
+        <div id="menuLogo">
+            <h1>SHATTERREALMS</h1>
+            <h2>Realism Edition</h2>
+        </div>
         <div id="deviceSelect">
             <p style="color: #aaa; margin-bottom: 15px;">Select your device:</p>
             <button class="menu-btn" onclick="selectDevice('computer')">🖥️ Computer</button>
             <button class="menu-btn" onclick="selectDevice('mobile')">📱 Mobile</button>
         </div>
         <div id="startSection" style="display: none;">
-            <button class="menu-btn" onclick="startGame()">⚔️ Solo Play</button>
-            <button class="menu-btn" onclick="joinMultiplayer()" style="background: linear-gradient(135deg, #4a0080, #800080);">👥 Multiplayer</button>
-            <button class="menu-btn shop-btn" onclick="openShop()">🛒 Shop</button>
-            <button class="menu-btn" onclick="openInventory()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">📦 Inventory</button>
-            <button class="menu-btn" onclick="openFriendsPanel()" style="background: linear-gradient(135deg, #3498db, #2980b9);">👥 Friends</button>
-            <button class="menu-btn settings-btn" onclick="openSettings()">⚙️ Settings</button>
-            <button class="menu-btn quit-btn" onclick="quitGame()">🚪 Quit</button>
-            <div id="menuCoins" style="color: gold; margin-top: 12px; font-size: 16px;">💰 0 <button id="menuAddCoins" onclick="openCustomCoinModal()" style="background: gold; color: #000; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 16px; font-weight: bold; cursor: pointer; margin-left: 5px;">+</button></div>
+            <div id="menuCoinsTop">
+                <span id="menuCoins">0</span>
+                <button id="menuAddCoins" onclick="openCustomCoinModal()">+</button>
+            </div>
+            <div class="menu-play-buttons">
+                <button class="menu-btn menu-btn-primary" onclick="startGame()">⚔️ Solo Play</button>
+                <button class="menu-btn menu-btn-multiplayer" onclick="joinMultiplayer()">👥 Multiplayer</button>
+            </div>
+            <div class="menu-grid">
+                <button class="menu-grid-btn" onclick="openShop()" style="--btn-color: #f39c12;">
+                    <span class="menu-grid-icon">🛒</span><span>Shop</span>
+                </button>
+                <button class="menu-grid-btn" onclick="openInventory()" style="--btn-color: #9b59b6;">
+                    <span class="menu-grid-icon">📦</span><span>Inventory</span>
+                </button>
+                <button class="menu-grid-btn" onclick="openDailyTasks()" style="--btn-color: #2ecc71;">
+                    <span class="menu-grid-icon">📋</span><span>Daily Tasks</span>
+                    <span id="dailyTasksBadge" class="menu-badge" style="display:none;">!</span>
+                </button>
+                <button class="menu-grid-btn" onclick="openFriendsPanel()" style="--btn-color: #3498db;">
+                    <span class="menu-grid-icon">👥</span><span>Friends</span>
+                </button>
+                <button class="menu-grid-btn" onclick="openAvatarCustomizer()" style="--btn-color: #e91e63;">
+                    <span class="menu-grid-icon">👤</span><span>Avatar</span>
+                </button>
+                <button class="menu-grid-btn" onclick="openPromoCodeModal()" style="--btn-color: #ff6b00;">
+                    <span class="menu-grid-icon">🎁</span><span>Promo</span>
+                </button>
+            </div>
+            <div class="menu-bottom-row">
+                <button class="menu-btn settings-btn" onclick="openSettings()">⚙️ Settings</button>
+                <button class="menu-btn quit-btn" onclick="quitGame()">🚪 Quit</button>
+            </div>
         </div>
     </div>
     
@@ -191,6 +219,19 @@
                 <button class="menu-btn" id="createFriendsServerBtn" onclick="createFriendsServer()" style="width: 100%; padding: 8px; font-size: 12px; background: linear-gradient(135deg, #9b59b6, #8e44ad); margin-bottom: 8px;">Create Friends Server</button>
                 <div id="friendsServersList"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Daily Tasks Panel -->
+    <div id="dailyTasksPanel" class="panel" style="display: none; max-width: 420px; border-color: #2ecc71;">
+        <div class="panel-header">
+            <h2 style="color: #2ecc71;">📋 Daily Tasks</h2>
+            <button class="close-btn" onclick="closeDailyTasks()">✕</button>
+        </div>
+        <div class="panel-content">
+            <div id="dailyTasksDate" style="color: #888; font-size: 11px; text-align: center; margin-bottom: 10px;"></div>
+            <div id="dailyTasksList"></div>
+            <div id="dailyTasksResetTimer" style="color: #666; font-size: 11px; text-align: center; margin-top: 12px;"></div>
         </div>
     </div>
 
@@ -821,7 +862,7 @@
                 }
                 // Save to cookie as backup
                 saveInventoryToCookie();
-                document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+                document.getElementById('menuCoins').textContent = inventory.coins;
                 document.getElementById('coinsDisplay').textContent = '💰 ' + inventory.coins;
                 console.log('Loaded from cloud:', inventory);
                 console.log('Hotbar updated:', hotbar);
@@ -835,7 +876,7 @@
                     if (document.getElementById('hotbar')) {
                         setupHotbar();
                     }
-                    document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+                    document.getElementById('menuCoins').textContent = inventory.coins;
                     document.getElementById('coinsDisplay').textContent = '💰 ' + inventory.coins;
                     console.log('Loaded from cookie:', inventory);
                 }
@@ -1090,6 +1131,224 @@
             { id: 'holy_lance', price: 580 }
         ];
         
+        // Promo codes system - 50 rebalanced starter-friendly rewards
+        const promoCodes = {
+            'SHATTER100': { coins: 30, desc: '30 shard coins.' },
+            'WELCOME': { coins: 50, desc: 'Small welcome bonus.' },
+            'REALM500': { coins: 75, desc: '75 realm coins.' },
+            'WARRIOR': { coins: 15, item: 'axe', desc: 'Starter axe + 15 coins.' },
+            'MAGE': { coins: 15, item: 'iceball', desc: 'Ice blast + 15 coins.' },
+            'ASSASSIN': { coins: 20, item: 'dagger', desc: 'Dagger + 20 coins.' },
+            'TANKMODE': { coins: 15, item: 'shield', desc: 'Shield + 15 coins.' },
+            'HEALER': { coins: 20, item: 'medkit', desc: 'Medkit + 20 coins.' },
+            'SPEEDRUN': { coins: 15, item: 'speedBoost', desc: 'Speed boost + 15 coins.' },
+            'LEGEND2026': { coins: 100, desc: '100 legend coins.' },
+            'FIRSTBLOOD': { coins: 15, item: 'shuriken', desc: 'Shuriken + 15 coins.' },
+            'BOSSSLAYER': { coins: 15, item: 'mace', desc: 'Mace + 15 coins.' },
+            'DUNGEON': { coins: 20, item: 'shovel', desc: 'Battle shovel + 20 coins.' },
+            'KNIGHT': { coins: 15, item: 'spear', desc: 'Spear + 15 coins.' },
+            'NINJA': { coins: 15, item: 'kunai', desc: 'Kunai + 15 coins.' },
+            'ARCHER': { coins: 15, item: 'bow', desc: 'Bow + 15 coins.' },
+            'PYRO': { coins: 15, item: 'molotov', desc: 'Molotov + 15 coins.' },
+            'BOMBER': { coins: 15, item: 'flashbang', desc: 'Flashbang + 15 coins.' },
+            'SUMMONER': { coins: 15, item: 'whip', desc: 'Whip + 15 coins.' },
+            'DRAGON': { coins: 15, item: 'claws', desc: 'Wolf claws + 15 coins.' },
+            'GOLEM': { coins: 15, item: 'pickaxe', desc: 'Pickaxe + 15 coins.' },
+            'PHOENIX': { coins: 15, item: 'megaHeal', desc: 'Mega heal + 15 coins.' },
+            'FLAMEKING': { coins: 10, item: 'molotov', desc: 'Molotov + 10 coins.' },
+            'FROSTKING': { coins: 10, item: 'iceball', desc: 'Ice blast + 10 coins.' },
+            'THUNDER': { coins: 10, item: 'flashbang', desc: 'Flashbang + 10 coins.' },
+            'SHADOW': { coins: 15, item: 'smoke_bomb', desc: 'Smoke bomb + 15 coins.' },
+            'HOLY': { coins: 15, item: 'megaHeal', desc: 'Mega heal + 15 coins.' },
+            'WIND': { coins: 15, item: 'boomerang', desc: 'Boomerang + 15 coins.' },
+            'VENOM': { coins: 15, item: 'blowdart', desc: 'Blowdart + 15 coins.' },
+            'EARTH': { coins: 15, item: 'shovel', desc: 'Battle shovel + 15 coins.' },
+            'RAGE': { coins: 15, item: 'nunchucks', desc: 'Nunchucks + 15 coins.' },
+            'INVISIBLE': { coins: 10, item: 'smoke_bomb', desc: 'Smoke bomb + 10 coins.' },
+            'TELEPORT': { coins: 15, item: 'jumpPad', desc: 'Jump pad + 15 coins.' },
+            'REFLECT': { coins: 10, item: 'shield', desc: 'Shield + 10 coins.' },
+            'VAMPIRE': { coins: 15, item: 'sickle', desc: 'Sickle + 15 coins.' },
+            'TIMESTOP': { coins: 10, item: 'flashbang', desc: 'Flashbang + 10 coins.' },
+            'BERSERK': { coins: 15, item: 'gauntlet', desc: 'Power gauntlet + 15 coins.' },
+            'FORT': { coins: 10, item: 'shield', desc: 'Shield + 10 coins.' },
+            'REGEN': { coins: 15, item: 'medkit', desc: 'Medkit + 15 coins.' },
+            'ENERGY': { coins: 15, item: 'speedBoost', desc: 'Speed boost + 15 coins.' },
+            'CLONEWARS': { coins: 10, item: 'kunai', desc: 'Kunai + 10 coins.' },
+            'STORMCALL': { coins: 15, item: 'boomerang', desc: 'Boomerang + 15 coins.' },
+            'BLIZZARD': { coins: 10, item: 'iceball', desc: 'Ice blast + 10 coins.' },
+            'INFERNO': { coins: 10, item: 'molotov', desc: 'Molotov + 10 coins.' },
+            'SUPERNOVA': { coins: 125, desc: '125 supernova coins.' },
+            'DARKARTS': { coins: 15, item: 'poison', desc: 'Poison cloud + 15 coins.' },
+            'NUKE': { coins: 10, item: 'grenade', desc: 'Grenade + 10 coins.' },
+            'CROSSBOW': { coins: 15, item: 'bow', desc: 'Bow + 15 coins.' },
+            'KATANA': { coins: 10, item: 'katana', desc: 'Katana + 10 coins.' },
+            'CHAINSAW': { coins: 15, item: 'wrench', desc: 'Giant wrench + 15 coins.' }
+        };
+        let redeemedCodes = JSON.parse(localStorage.getItem('redeemedCodes') || '[]');
+
+        function openPromoCodeModal() {
+            const existing = document.getElementById('promoModal');
+            if (existing) existing.remove();
+            const modal = document.createElement('div');
+            modal.id = 'promoModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid #a0f;border-radius:12px;padding:30px;text-align:center;max-width:400px;width:90%;">
+                    <h2 style="color:#a0f;margin:0 0 15px;">🎁 PROMO CODE</h2>
+                    <input id="promoInput" type="text" placeholder="Enter code..." style="width:80%;padding:12px;border-radius:8px;border:2px solid #a0f;background:#0a0a1a;color:#fff;font-size:16px;text-align:center;text-transform:uppercase;" />
+                    <div style="margin-top:15px;">
+                        <button onclick="redeemPromoCode()" style="background:linear-gradient(135deg,#a0f,#60f);color:#fff;border:none;padding:12px 30px;border-radius:8px;font-size:16px;cursor:pointer;margin-right:10px;">Redeem</button>
+                        <button onclick="document.getElementById('promoModal').remove()" style="background:#333;color:#fff;border:none;padding:12px 30px;border-radius:8px;font-size:16px;cursor:pointer;">Close</button>
+                    </div>
+                    <div id="promoResult" style="margin-top:15px;font-size:14px;"></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('promoInput').focus();
+        }
+
+        function redeemPromoCode() {
+            const input = document.getElementById('promoInput');
+            const result = document.getElementById('promoResult');
+            const code = input.value.trim().toUpperCase();
+
+            if (!code) { result.innerHTML = '<span style="color:#f44;">Enter a code!</span>'; return; }
+            if (redeemedCodes.includes(code)) { result.innerHTML = '<span style="color:#f44;">Code already redeemed!</span>'; return; }
+            if (!promoCodes[code]) { result.innerHTML = '<span style="color:#f44;">Invalid code!</span>'; return; }
+
+            const reward = promoCodes[code];
+            inventory.coins += reward.coins;
+            if (reward.item && !inventory.ownedItems.includes(reward.item)) {
+                inventory.ownedItems.push(reward.item);
+                const emptySlot = hotbar.findIndex(s => s === null);
+                if (emptySlot !== -1) hotbar[emptySlot] = reward.item;
+            }
+            redeemedCodes.push(code);
+            localStorage.setItem('redeemedCodes', JSON.stringify(redeemedCodes));
+            saveCoinsToCloud();
+            updateShopUI();
+            setupHotbar();
+            result.innerHTML = `<span style="color:#0f0;">✅ ${reward.desc}</span>`;
+            input.value = '';
+            document.getElementById('menuCoins').textContent = inventory.coins;
+        }
+
+        // Avatar customization system
+        const avatarSkins = {
+            head: [
+                { id: 'default_head', name: 'Default', color: 0xffcc99, price: 0 },
+                { id: 'pale_head', name: 'Pale', color: 0xffe0bd, price: 50 },
+                { id: 'tan_head', name: 'Tan', color: 0xd2a679, price: 50 },
+                { id: 'dark_head', name: 'Dark', color: 0x8d5524, price: 50 },
+                { id: 'blue_head', name: 'Frost', color: 0x88ccff, price: 200 },
+                { id: 'red_head', name: 'Demon', color: 0xff4444, price: 300 },
+                { id: 'green_head', name: 'Orc', color: 0x66bb6a, price: 200 },
+                { id: 'gold_head', name: 'Golden', color: 0xffd700, price: 500 }
+            ],
+            body: [
+                { id: 'default_body', name: 'Blue Armor', color: 0x2244aa, price: 0 },
+                { id: 'red_body', name: 'Red Armor', color: 0xaa2244, price: 100 },
+                { id: 'green_body', name: 'Forest', color: 0x2e7d32, price: 100 },
+                { id: 'purple_body', name: 'Royal', color: 0x7b1fa2, price: 150 },
+                { id: 'black_body', name: 'Shadow', color: 0x1a1a1a, price: 200 },
+                { id: 'white_body', name: 'Holy', color: 0xeeeeee, price: 200 },
+                { id: 'gold_body', name: 'Golden', color: 0xffd700, price: 500 },
+                { id: 'rainbow_body', name: 'Prismatic', color: 0xff00ff, price: 800 }
+            ],
+            arms: [
+                { id: 'default_arms', name: 'Match Body', color: null, price: 0 },
+                { id: 'steel_arms', name: 'Steel Gauntlets', color: 0x888888, price: 100 },
+                { id: 'gold_arms', name: 'Gold Gauntlets', color: 0xffd700, price: 300 },
+                { id: 'dark_arms', name: 'Shadow Arms', color: 0x222222, price: 200 },
+                { id: 'fire_arms', name: 'Flame Arms', color: 0xff4400, price: 250 },
+                { id: 'ice_arms', name: 'Frost Arms', color: 0x44aaff, price: 250 }
+            ],
+            legs: [
+                { id: 'default_legs', name: 'Dark Pants', color: 0x333355, price: 0 },
+                { id: 'brown_legs', name: 'Leather', color: 0x795548, price: 80 },
+                { id: 'black_legs', name: 'Shadow', color: 0x111111, price: 100 },
+                { id: 'white_legs', name: 'Holy', color: 0xdddddd, price: 100 },
+                { id: 'red_legs', name: 'Blood', color: 0x880000, price: 150 },
+                { id: 'gold_legs', name: 'Golden', color: 0xffd700, price: 400 }
+            ]
+        };
+
+        let playerAvatar = JSON.parse(localStorage.getItem('playerAvatar') || JSON.stringify({
+            head: 'default_head', body: 'default_body', arms: 'default_arms', legs: 'default_legs'
+        }));
+        let ownedSkins = JSON.parse(localStorage.getItem('ownedSkins') || '["default_head","default_body","default_arms","default_legs"]');
+
+        function getAvatarColors() {
+            const findSkin = (part, id) => avatarSkins[part].find(s => s.id === id) || avatarSkins[part][0];
+            const bodySkin = findSkin('body', playerAvatar.body);
+            const armSkin = findSkin('arms', playerAvatar.arms);
+            return {
+                skinColor: findSkin('head', playerAvatar.head).color,
+                bodyColor: bodySkin.color,
+                armColor: armSkin.color || bodySkin.color,
+                legColor: findSkin('legs', playerAvatar.legs).color
+            };
+        }
+
+        function openAvatarCustomizer() {
+            const existing = document.getElementById('avatarModal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'avatarModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+            let html = `<div style="background:#1a1a2e;border:2px solid #e91e63;border-radius:12px;padding:25px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">
+                <h2 style="color:#e91e63;margin:0 0 15px;text-align:center;">👤 AVATAR CUSTOMIZER</h2>
+                <div style="color:gold;text-align:center;margin-bottom:15px;">💰 ${inventory.coins} coins</div>`;
+
+            ['head', 'body', 'arms', 'legs'].forEach(part => {
+                const partLabel = part.charAt(0).toUpperCase() + part.slice(1);
+                html += `<div style="margin-bottom:15px;">
+                    <h3 style="color:#aaa;margin:0 0 8px;">${partLabel}</h3>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+                avatarSkins[part].forEach(skin => {
+                    const owned = ownedSkins.includes(skin.id);
+                    const equipped = playerAvatar[part] === skin.id;
+                    const canAfford = inventory.coins >= skin.price;
+                    const colorHex = '#' + (skin.color || 0x2244aa).toString(16).padStart(6, '0');
+                    const border = equipped ? '3px solid #0f0' : owned ? '2px solid #666' : '2px solid #333';
+                    html += `<div onclick="avatarAction('${part}','${skin.id}',${skin.price})" style="cursor:pointer;background:#111;border:${border};border-radius:8px;padding:6px 10px;text-align:center;min-width:70px;">
+                        <div style="width:24px;height:24px;border-radius:50%;background:${colorHex};margin:0 auto 4px;border:1px solid #555;"></div>
+                        <div style="color:#fff;font-size:11px;">${skin.name}</div>
+                        <div style="color:${equipped ? '#0f0' : owned ? '#888' : canAfford ? 'gold' : '#f44'};font-size:10px;">${equipped ? 'Equipped' : owned ? 'Owned' : '💰' + skin.price}</div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            });
+
+            html += `<div style="text-align:center;margin-top:15px;">
+                <button onclick="document.getElementById('avatarModal').remove()" style="background:#e91e63;color:#fff;border:none;padding:12px 30px;border-radius:8px;font-size:16px;cursor:pointer;">Done</button>
+            </div></div>`;
+
+            modal.innerHTML = html;
+            document.body.appendChild(modal);
+        }
+
+        function avatarAction(part, skinId, price) {
+            if (ownedSkins.includes(skinId)) {
+                // Equip
+                playerAvatar[part] = skinId;
+                localStorage.setItem('playerAvatar', JSON.stringify(playerAvatar));
+                openAvatarCustomizer(); // Refresh UI
+            } else if (inventory.coins >= price) {
+                // Buy and equip
+                inventory.coins -= price;
+                ownedSkins.push(skinId);
+                playerAvatar[part] = skinId;
+                localStorage.setItem('playerAvatar', JSON.stringify(playerAvatar));
+                localStorage.setItem('ownedSkins', JSON.stringify(ownedSkins));
+                saveCoinsToCloud();
+                document.getElementById('menuCoins').textContent = inventory.coins;
+                openAvatarCustomizer(); // Refresh UI
+            }
+        }
+
         let hotbar = ['sword', 'fireball', null, null, null, null];
         let selectedSlot = 0;
         let itemCooldowns = {};
@@ -2402,6 +2661,49 @@
                 document.getElementById('startSection').style.display = 'block';
             }
         }
+
+        // Menu background floating particles
+        (function initMenuParticles() {
+            const container = document.getElementById('menuBgParticles');
+            if (!container) return;
+            const count = 30;
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                const size = 2 + Math.random() * 4;
+                const x = Math.random() * 100;
+                const delay = Math.random() * 20;
+                const duration = 12 + Math.random() * 18;
+                const hue = 220 + Math.random() * 60;
+                p.style.cssText = `
+                    position: absolute;
+                    width: ${size}px;
+                    height: ${size}px;
+                    background: hsl(${hue}, 70%, 60%);
+                    border-radius: 50%;
+                    left: ${x}%;
+                    bottom: -10px;
+                    opacity: ${0.15 + Math.random() * 0.25};
+                    animation: menuParticleFloat ${duration}s ${delay}s linear infinite;
+                    pointer-events: none;
+                    filter: blur(${Math.random() > 0.5 ? 1 : 0}px);
+                `;
+                container.appendChild(p);
+            }
+            // Add CSS animation
+            if (!document.getElementById('menuParticleStyle')) {
+                const style = document.createElement('style');
+                style.id = 'menuParticleStyle';
+                style.textContent = `
+                    @keyframes menuParticleFloat {
+                        0% { transform: translateY(0) translateX(0); opacity: 0; }
+                        10% { opacity: 0.3; }
+                        90% { opacity: 0.3; }
+                        100% { transform: translateY(-110vh) translateX(${30 - Math.random() * 60}px); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        })();
         
         function openShop() { document.getElementById('shopPanel').style.display = 'flex'; updateShopUI(); }
         function closeShop() { document.getElementById('shopPanel').style.display = 'none'; }
@@ -2503,7 +2805,7 @@
                 el.appendChild(div);
             });
 
-            document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+            document.getElementById('menuCoins').textContent = inventory.coins;
         }
         
         function buyItem(itemId, price) {
@@ -4690,6 +4992,7 @@
             document.getElementById('bossHealth').style.display = 'none';
             announceWave('BOSS DEFEATED!');
             updateHUD();
+            updateDailyTaskProgress('bosses', 1);
 
             setTimeout(() => { currentWave++; startWave(); }, 3000);
         }
@@ -4756,6 +5059,7 @@
         
         function gameOver() {
             gameRunning = false;
+            stopPlaytimeTracking();
             document.getElementById('finalWave').textContent = currentWave;
             document.getElementById('finalScore').textContent = playerState.score;
             document.getElementById('finalCoins').textContent = inventory.coins;
@@ -4764,6 +5068,16 @@
             // Release pointer lock so user can click buttons
             if (document.exitPointerLock) document.exitPointerLock();
             saveCoinsToCloud(); // Save coins when game ends
+
+            // Track daily task progress
+            updateDailyTaskProgress('kills', playerState.kills);
+            updateDailyTaskProgress('waves', currentWave);
+            updateDailyTaskProgress('score', playerState.score);
+            updateDailyTaskProgress('coins_collected', sessionCoinsCollected);
+            updateDailyTaskProgress('games', 1);
+
+            // Show interstitial ad between games
+            if (typeof showInterstitialAd === 'function') showInterstitialAd();
         }
         
         // Get terrain height at any position
@@ -5114,7 +5428,8 @@
                 
                 if (dist < collectRange) {
                     inventory.coins += c.value;
-                    
+                    if (typeof sessionCoinsCollected !== 'undefined') sessionCoinsCollected += c.value;
+
                     const div = document.createElement('div');
                     div.className = 'coin-pickup';
                     div.textContent = '+' + c.value + ' 💰';
@@ -5122,7 +5437,7 @@
                     div.style.top = '35%';
                     document.body.appendChild(div);
                     setTimeout(() => div.remove(), 1000);
-                    
+
                     scene.remove(c.mesh);
                     coins.splice(i, 1);
                     updateHUD();
@@ -5918,7 +6233,7 @@
             document.getElementById('minimap').style.display = 'none';
             document.getElementById('mobileControls').style.display = 'none';
 
-            document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+            document.getElementById('menuCoins').textContent = inventory.coins;
 
             // Release pointer lock
             if (document.exitPointerLock) document.exitPointerLock();
@@ -7258,10 +7573,12 @@
             }
 
             gameRunning = true;
+            sessionCoinsCollected = 0;
             updateBuildStatusUI();
+            startPlaytimeTracking();
             startWave();
         }
-        
+
         function restartGame() {
             playerState.position.set(0, 1.7, 0);
             playerState.velocity.set(0, 0, 0);
@@ -7294,11 +7611,14 @@
             
             document.getElementById('gameOver').style.display = 'none';
             gameRunning = true;
+            sessionCoinsCollected = 0;
             updateBuildStatusUI();
+            startPlaytimeTracking();
             startWave();
         }
-        
+
         function backToMenu() {
+            stopPlaytimeTracking();
             gameRunning = false;
             renderer.domElement.style.display = 'none';
             if (document.exitPointerLock) document.exitPointerLock();
@@ -7313,7 +7633,7 @@
             document.getElementById('mobileControls').style.display = 'none';
             document.getElementById('buildStatus').style.display = 'none';
 
-            document.getElementById('menuCoins').textContent = '💰 ' + inventory.coins;
+            document.getElementById('menuCoins').textContent = inventory.coins;
             saveCoinsToCloud(); // Save coins when returning to menu
             
             enemies.forEach(e => scene.remove(e.mesh));
@@ -7344,9 +7664,216 @@
             }
         });
         
+        // ========== DAILY TASKS SYSTEM ==========
+        let dailyTasks = [];
+        let dailyTaskProgress = {};
+        let dailyTaskDate = '';
+        let gameStartTime = 0;
+        let sessionPlaytimeMinutes = 0;
+        let sessionCoinsCollected = 0;
+
+        function getDailyTaskStorageKey() {
+            return 'sr_daily_' + new Date().toISOString().split('T')[0];
+        }
+
+        function loadDailyTaskProgress() {
+            const key = getDailyTaskStorageKey();
+            try {
+                const saved = localStorage.getItem(key);
+                if (saved) {
+                    dailyTaskProgress = JSON.parse(saved);
+                } else {
+                    dailyTaskProgress = {};
+                    // Clear old day data
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k && k.startsWith('sr_daily_') && k !== key) {
+                            localStorage.removeItem(k);
+                        }
+                    }
+                }
+            } catch (e) {
+                dailyTaskProgress = {};
+            }
+        }
+
+        function saveDailyTaskProgress() {
+            const key = getDailyTaskStorageKey();
+            try {
+                localStorage.setItem(key, JSON.stringify(dailyTaskProgress));
+            } catch (e) { /* storage full */ }
+        }
+
+        function updateDailyTaskProgress(type, amount) {
+            if (!dailyTasks.length) return;
+            let changed = false;
+            dailyTasks.forEach(task => {
+                if (task.type === type) {
+                    const progressKey = task.id;
+                    const prev = dailyTaskProgress[progressKey] || 0;
+                    if (prev < task.target) {
+                        if (type === 'games' || type === 'bosses' || type === 'coins_collected') {
+                            dailyTaskProgress[progressKey] = prev + amount;
+                        } else {
+                            dailyTaskProgress[progressKey] = Math.max(prev, amount);
+                        }
+                        changed = true;
+                        // Check if just completed
+                        if (dailyTaskProgress[progressKey] >= task.target && prev < task.target) {
+                            if (!dailyTaskProgress[progressKey + '_claimed']) {
+                                showDailyTaskNotification(task);
+                            }
+                        }
+                    }
+                }
+            });
+            if (changed) saveDailyTaskProgress();
+        }
+
+        function showDailyTaskNotification(task) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.style.cssText = 'border-color: #2ecc71; pointer-events: auto;';
+            toast.innerHTML = `
+                <div style="color:#2ecc71;font-weight:bold;font-size:13px;">📋 Task Complete!</div>
+                <div style="color:#ccc;font-size:11px;margin-top:3px;">${task.icon} ${task.label}</div>
+                <div style="color:gold;font-size:12px;margin-top:3px;">+${task.reward} coins - Open Daily Tasks to claim</div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
+            updateDailyTasksBadge();
+        }
+
+        function updateDailyTasksBadge() {
+            const badge = document.getElementById('dailyTasksBadge');
+            if (!badge) return;
+            let unclaimed = 0;
+            dailyTasks.forEach(task => {
+                const progress = dailyTaskProgress[task.id] || 0;
+                if (progress >= task.target && !dailyTaskProgress[task.id + '_claimed']) {
+                    unclaimed++;
+                }
+            });
+            badge.style.display = unclaimed > 0 ? 'inline-block' : 'none';
+            badge.textContent = unclaimed;
+        }
+
+        async function fetchDailyTasks() {
+            try {
+                const res = await fetch('/api/daily-tasks');
+                const data = await res.json();
+                dailyTasks = data.tasks || [];
+                dailyTaskDate = data.date || '';
+                loadDailyTaskProgress();
+                updateDailyTasksBadge();
+            } catch (e) {
+                // Fallback tasks if API is unavailable
+                dailyTasks = [
+                    { id: 'kills_10', type: 'kills', target: 10, reward: 50, label: 'Defeat 10 enemies', icon: '⚔️' },
+                    { id: 'play_5', type: 'playtime', target: 5, reward: 30, label: 'Play for 5 minutes', icon: '⏱️' },
+                    { id: 'wave_3', type: 'waves', target: 3, reward: 60, label: 'Survive 3 waves', icon: '🌊' },
+                ];
+                loadDailyTaskProgress();
+            }
+        }
+
+        function openDailyTasks() {
+            document.getElementById('dailyTasksPanel').style.display = 'flex';
+            renderDailyTasks();
+        }
+
+        function closeDailyTasks() {
+            document.getElementById('dailyTasksPanel').style.display = 'none';
+        }
+
+        function renderDailyTasks() {
+            const list = document.getElementById('dailyTasksList');
+            const dateEl = document.getElementById('dailyTasksDate');
+            const timerEl = document.getElementById('dailyTasksResetTimer');
+            if (!list) return;
+
+            dateEl.textContent = dailyTaskDate ? 'Tasks for ' + dailyTaskDate : '';
+
+            // Calculate time until reset (midnight UTC)
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+            tomorrow.setUTCHours(0, 0, 0, 0);
+            const diff = tomorrow - now;
+            const hrs = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            timerEl.textContent = 'Resets in ' + hrs + 'h ' + mins + 'm';
+
+            list.innerHTML = '';
+            dailyTasks.forEach(task => {
+                const progress = dailyTaskProgress[task.id] || 0;
+                const completed = progress >= task.target;
+                const claimed = dailyTaskProgress[task.id + '_claimed'] || false;
+                const pct = Math.min(100, Math.round((progress / task.target) * 100));
+
+                const div = document.createElement('div');
+                div.className = 'daily-task-item' + (claimed ? ' claimed' : completed ? ' completed' : '');
+                div.innerHTML = `
+                    <div class="daily-task-icon">${task.icon}</div>
+                    <div class="daily-task-info">
+                        <div class="daily-task-label">${task.label}</div>
+                        <div class="daily-task-progress-bar">
+                            <div class="daily-task-progress-fill" style="width:${pct}%"></div>
+                        </div>
+                        <div class="daily-task-progress-text">${Math.min(progress, task.target)} / ${task.target}</div>
+                    </div>
+                    <div class="daily-task-reward">
+                        ${claimed ? '<span style="color:#2ecc71;">Claimed</span>' : completed ? '<button class="daily-task-claim-btn" onclick="claimDailyTask(\'' + task.id + '\',' + task.reward + ')">Claim ' + task.reward + '</button>' : '<span style="color:#888;">' + task.reward + ' coins</span>'}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function claimDailyTask(taskId, reward) {
+            if (dailyTaskProgress[taskId + '_claimed']) return;
+            dailyTaskProgress[taskId + '_claimed'] = true;
+            inventory.coins += reward;
+            saveDailyTaskProgress();
+            saveCoinsToCloud();
+            document.getElementById('menuCoins').textContent = inventory.coins;
+            renderDailyTasks();
+            updateDailyTasksBadge();
+
+            // Show claim notification
+            const container = document.getElementById('notificationContainer');
+            if (container) {
+                const toast = document.createElement('div');
+                toast.className = 'notification-toast';
+                toast.style.cssText = 'border-color: gold; pointer-events: auto;';
+                toast.innerHTML = '<div style="color:gold;font-weight:bold;">+' + reward + ' coins claimed!</div>';
+                container.appendChild(toast);
+                setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2500);
+            }
+        }
+
+        // Track playtime
+        function startPlaytimeTracking() {
+            gameStartTime = Date.now();
+        }
+
+        function stopPlaytimeTracking() {
+            if (gameStartTime > 0) {
+                const elapsed = Math.floor((Date.now() - gameStartTime) / 60000);
+                sessionPlaytimeMinutes += elapsed;
+                updateDailyTaskProgress('playtime', sessionPlaytimeMinutes);
+                gameStartTime = 0;
+            }
+        }
+
+        // ========== END DAILY TASKS ==========
+
         init();
         initDeviceMode();
         checkPaymentSuccess();
+        fetchDailyTasks();
         gameLoop(0);
 
         // Hide menu initially and start auth flow
@@ -7363,6 +7890,21 @@
         <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
         <button onclick="document.getElementById('ad-container').style.display='none'" style="position:absolute;top:2px;right:10px;background:none;border:none;color:#888;font-size:16px;cursor:pointer;">&times;</button>
     </div>
+
+    <!-- Google AdSense Interstitial Ad (between games) -->
+    <div id="ad-interstitial" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center; flex-direction:column;">
+        <div style="color:#888; font-size:12px; margin-bottom:10px;">Advertisement</div>
+        <div style="background:#111; border:1px solid #333; border-radius:10px; padding:10px; max-width:728px; width:90%;">
+            <ins class="adsbygoogle"
+                style="display:block;width:100%;height:250px"
+                data-ad-client="ca-pub-1047791604360922"
+                data-ad-slot="8200255613"
+                data-ad-format="rectangle"></ins>
+        </div>
+        <button id="adInterstitialClose" onclick="closeInterstitialAd()" style="margin-top:15px; padding:10px 30px; background:linear-gradient(135deg,#4a00e0,#8e2de2); border:none; border-radius:10px; color:white; font-size:14px; cursor:pointer; display:none;">Continue</button>
+        <div id="adInterstitialTimer" style="color:#666; font-size:12px; margin-top:8px;"></div>
+    </div>
+
     <script>
         // Only show ad container when an ad actually loads
         const adContainer = document.getElementById('ad-container');
@@ -7370,7 +7912,6 @@
 
         function checkAdLoaded() {
             const adEl = adContainer.querySelector('.adsbygoogle');
-            // AdSense fills the ins element with content when an ad loads
             if (adEl && (adEl.dataset.adStatus === 'filled' || adEl.children.length > 0)) {
                 adLoaded = true;
                 if (document.getElementById('menu').style.display !== 'none') {
@@ -7381,12 +7922,10 @@
             }
         }
 
-        // Check periodically until ad loads (AdSense can be slow)
         const adCheckInterval = setInterval(function() {
             checkAdLoaded();
             if (adLoaded) clearInterval(adCheckInterval);
         }, 1000);
-        // Stop checking after 30 seconds if no ad loads
         setTimeout(function() { clearInterval(adCheckInterval); }, 30000);
 
         // Hide during gameplay, show on menu (only if ad loaded)
@@ -7403,6 +7942,36 @@
                 if (adLoaded) adContainer.style.display = 'block';
                 return _origReturn.apply(this, arguments);
             };
+        }
+
+        // Interstitial ad between games
+        let interstitialShownCount = 0;
+        function showInterstitialAd() {
+            interstitialShownCount++;
+            // Show interstitial every other game over
+            if (interstitialShownCount % 2 !== 0) return;
+            const el = document.getElementById('ad-interstitial');
+            el.style.display = 'flex';
+            const closeBtn = document.getElementById('adInterstitialClose');
+            const timerEl = document.getElementById('adInterstitialTimer');
+            closeBtn.style.display = 'none';
+            let countdown = 5;
+            timerEl.textContent = 'Skip in ' + countdown + 's';
+            try { (adsbygoogle = window.adsbygoogle || []).push({}); } catch(e) {}
+            const timer = setInterval(function() {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    closeBtn.style.display = 'inline-block';
+                    timerEl.textContent = '';
+                } else {
+                    timerEl.textContent = 'Skip in ' + countdown + 's';
+                }
+            }, 1000);
+        }
+
+        function closeInterstitialAd() {
+            document.getElementById('ad-interstitial').style.display = 'none';
         }
     </script>
 </body>
